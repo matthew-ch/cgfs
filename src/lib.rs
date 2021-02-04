@@ -98,6 +98,7 @@ pub struct Scene {
     distance_to_camera: f32,
     background: Color,
     objects: Vec<Box<dyn SceneObject + Sync>>,
+    lights: Vec<Box<dyn LightObject + Sync>>,
 }
 
 impl Scene {
@@ -113,11 +114,16 @@ impl Scene {
             distance_to_camera,
             background,
             objects: Vec::new(),
+            lights: Vec::new(),
         }
     }
 
     pub fn add_object(&mut self, object: Box<dyn SceneObject + Sync>) {
         self.objects.push(object);
+    }
+
+    pub fn add_light(&mut self, light: Box<dyn LightObject + Sync>) {
+        self.lights.push(light);
     }
 
     pub fn canvas_to_viewport(&self, x: u16, y: u16, width: u16, height: u16) -> Point {
@@ -128,19 +134,23 @@ impl Scene {
         }
     }
 
+    fn compute_lighting(&self, point: &Point, normal: &Vector) -> f32 {
+        self.lights.iter().map(|light| light.intensity_from(point, normal)).sum()
+    }
+
     pub fn trace_ray(&self, ray: &Ray, t_min: f32, t_max: f32) -> Color {
-        let mut result: Option<(f32, Color)> = None;
+        let mut result: Option<HitTestResult> = None;
 
         for object in self.objects.iter() {
             if let Some(r) = object.hit_test(ray, t_min, t_max) {
                 if result.is_none() {
                     result = Some(r)
-                } else if r.0 < result.unwrap().0 {
+                } else if r.t < result.unwrap().t {
                     result = Some(r)
                 }
             }
         }
 
-        result.map_or(self.background, |r| r.1)
+        result.map_or(self.background, |r| r.color * self.compute_lighting(&r.point, &r.normal))
     }
 }

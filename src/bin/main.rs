@@ -1,4 +1,4 @@
-use cgfs::{ Canvas, Color, Scene, Sphere, Point };
+use cgfs::*;
 use std::path::Path;
 use std::fs::File;
 use std::io::BufWriter;
@@ -19,11 +19,16 @@ fn save_canvas_to(canvas: &Canvas, p: &str) {
 
 fn main() {
 
-    let mut canvas = Canvas::new(512, 512, Color::black());
+    let mut canvas = Canvas::new(600, 600, Color::black());
     let mut scene = Scene::new(1., 1., 1., Color::white());
-    scene.add_object(Box::new(Sphere::new(Point { x: 0., y: -1., z: 3. }, 1., Color::red())));
-    scene.add_object(Box::new(Sphere::new(Point { x: 2., y: 0., z: 4. }, 1., Color::blue())));
-    scene.add_object(Box::new(Sphere::new(Point { x: -2., y: 0., z: 4. }, 1., Color::green())));
+    scene.add_object(Box::new(Sphere { center: Point { x: 0., y: -1., z: 3. }, radius: 1., color: Color::red() }));
+    scene.add_object(Box::new(Sphere { center: Point { x: 2., y: 0., z: 4. },  radius: 1., color: Color::blue() }));
+    scene.add_object(Box::new(Sphere { center: Point { x: -2., y: 0., z: 4. }, radius: 1., color: Color::green() }));
+    scene.add_object(Box::new(Sphere { center: Point { x: 0., y: -5001., z: 0. }, radius: 5000., color: Color { r: 255, g: 255, b: 0 } }));
+
+    scene.add_light(Box::new(AmbientLight { intensity: 0.2 }));
+    scene.add_light(Box::new(PointLight { intensity: 0.6, position: Point { x: 2., y: 1., z: 0. } }));
+    scene.add_light(Box::new(DirectionalLight { intensity: 0.2, direction: Vector { dx: 1., dy: 4., dz: 4. } }));
 
     // let t1 = std::time::SystemTime::now();
     // canvas.render(&scene);
