@@ -19,7 +19,7 @@ fn save_canvas_to(canvas: &Canvas, p: &str) {
 
 fn main() {
     let mut canvas = Canvas::new(600, 600, Color::black());
-    let mut scene = Scene::new(1., 1., 1., Color::white());
+    let mut scene = Scene::new(1., 1., 1., Color::black());
     scene.add_object(Box::new(Sphere {
         center: Point {
             x: 0.,
@@ -29,6 +29,7 @@ fn main() {
         radius: 1.,
         color: Color::red(),
         specular: 500,
+        reflective: 0.2,
     }));
     scene.add_object(Box::new(Sphere {
         center: Point {
@@ -39,6 +40,7 @@ fn main() {
         radius: 1.,
         color: Color::blue(),
         specular: 500,
+        reflective: 0.3,
     }));
     scene.add_object(Box::new(Sphere {
         center: Point {
@@ -49,6 +51,7 @@ fn main() {
         radius: 1.,
         color: Color::green(),
         specular: 10,
+        reflective: 0.4,
     }));
     scene.add_object(Box::new(Sphere {
         center: Point {
@@ -58,11 +61,12 @@ fn main() {
         },
         radius: 5000.,
         color: Color {
-            r: 255,
-            g: 255,
-            b: 0,
+            r: 255.,
+            g: 255.,
+            b: 0.,
         },
         specular: 1000,
+        reflective: 0.5,
     }));
 
     scene.add_light(Box::new(AmbientLight { intensity: 0.2 }));
@@ -84,12 +88,12 @@ fn main() {
     }));
 
     // let t1 = std::time::SystemTime::now();
-    // canvas.render(&scene);
+    // canvas.render(&scene, 1);
     // let t2 = std::time::SystemTime::now();
     // println!("single thread render time: {:?}", t2.duration_since(t1));
 
     let t1 = std::time::SystemTime::now();
-    canvas.render_mth(&scene);
+    canvas.render_mth(&scene, 3);
     let t2 = std::time::SystemTime::now();
     println!("multi thread render time: {:?}", t2.duration_since(t1));
     save_canvas_to(&canvas, r"./output.png");
