@@ -134,8 +134,8 @@ impl Scene {
         }
     }
 
-    fn compute_lighting(&self, point: &Point, normal: &Vector) -> f32 {
-        self.lights.iter().map(|light| light.intensity_from(point, normal)).sum()
+    fn compute_lighting(&self, point: &Point, normal: &Vector, view: &Vector, specular: i32) -> f32 {
+        self.lights.iter().map(|light| light.intensity_from(point, normal, view, specular)).sum()
     }
 
     pub fn trace_ray(&self, ray: &Ray, t_min: f32, t_max: f32) -> Color {
@@ -151,6 +151,6 @@ impl Scene {
             }
         }
 
-        result.map_or(self.background, |r| r.color * self.compute_lighting(&r.point, &r.normal))
+        result.map_or(self.background, |r| r.color * self.compute_lighting(&r.point, &r.normal, &(-ray.direction), r.specular))
     }
 }

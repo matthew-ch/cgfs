@@ -6,6 +6,7 @@ pub struct HitTestResult {
     pub color: Color,
     pub point: Point,
     pub normal: Vector,
+    pub specular: i32,
 }
 
 pub trait SceneObject {
@@ -16,6 +17,7 @@ pub struct Sphere {
     pub center: Point,
     pub radius: f32,
     pub color: Color,
+    pub specular: i32,
 }
 
 impl SceneObject for Sphere {
@@ -46,13 +48,23 @@ impl SceneObject for Sphere {
                 color: self.color,
                 point,
                 normal: normal / normal.length(),
+                specular: self.specular,
             }
         })
     }
 }
 
 pub trait LightObject {
-    fn intensity_from(&self, point: &Point, normal: &Vector) -> f32;
+    fn intensity_from(&self, point: &Point, normal: &Vector, view: &Vector, specular: i32) -> f32;
+}
+
+fn compute_light_factor(normal: &Vector, light: &Vector, view: &Vector, specular: i32) -> f32 {
+    normal.cos(light).max(0.) + if specular >= 0 {
+        let reflection: Vector = *normal * normal.dot(light) * 2. - *light;
+        reflection.cos(view).max(0.).powi(specular)
+    } else {
+        0.
+    }
 }
 
 pub struct AmbientLight {
@@ -60,7 +72,7 @@ pub struct AmbientLight {
 }
 
 impl LightObject for AmbientLight {
-    fn intensity_from(&self, _point: &Point, _normal: &Vector) -> f32 {
+    fn intensity_from(&self, _point: &Point, _normal: &Vector, _view: &Vector, _specular: i32) -> f32 {
         self.intensity
     }
 }
@@ -71,9 +83,8 @@ pub struct PointLight {
 }
 
 impl LightObject for PointLight {
-    fn intensity_from(&self, point: &Point, normal: &Vector) -> f32 {
-        let l: Vector = self.position - *point;
-        normal.cos(&l).max(0.) * self.intensity
+    fn intensity_from(&self, point: &Point, normal: &Vector, view: &Vector, specular: i32) -> f32 {
+        self.intensity * compute_light_factor(normal, &(self.position - *point), view, specular)
     }
 }
 
@@ -83,8 +94,7 @@ pub struct DirectionalLight {
 }
 
 impl LightObject for DirectionalLight {
-    fn intensity_from(&self, _point: &Point, normal: &Vector) -> f32 {
-        let l = self.direction;
-        normal.cos(&l).max(0.) * self.intensity
+    fn intensity_from(&self, _point: &Point, normal: &Vector, view: &Vector, specular: i32) -> f32 {
+        self.intensity * compute_light_factor(normal, &self.direction, view, specular)
     }
 }

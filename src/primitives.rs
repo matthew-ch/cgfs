@@ -1,4 +1,4 @@
-use std::ops::{Add, Div, Mul, Sub};
+use std::ops::{Add, Div, Mul, Neg, Sub};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Color {
@@ -77,7 +77,7 @@ pub struct Point {
 impl Sub for Point {
     type Output = Vector;
 
-    fn sub(self, rhs: Self) -> Vector {
+    fn sub(self, rhs: Point) -> Vector {
         Vector {
             dx: self.x - rhs.x,
             dy: self.y - rhs.y,
@@ -120,6 +120,30 @@ impl Vector {
     }
 }
 
+impl Add<Vector> for Vector {
+    type Output = Vector;
+
+    fn add(self, rhs: Vector) -> Vector {
+        Vector {
+            dx: self.dx + rhs.dx,
+            dy: self.dy + rhs.dy,
+            dz: self.dz + rhs.dz,
+        }
+    }
+}
+
+impl Sub<Vector> for Vector {
+    type Output = Vector;
+
+    fn sub(self, rhs: Vector) -> Vector {
+        Vector {
+            dx: self.dx - rhs.dx,
+            dy: self.dy - rhs.dy,
+            dz: self.dz - rhs.dz,
+        }
+    }
+}
+
 impl Mul<f32> for Vector {
     type Output = Vector;
 
@@ -137,6 +161,18 @@ impl Div<f32> for Vector {
 
     fn div(self, rhs: f32) -> Vector {
         self.mul(1. / rhs)
+    }
+}
+
+impl Neg for Vector {
+    type Output = Vector;
+
+    fn neg(self) -> Vector {
+        Vector {
+            dx: -self.dx,
+            dy: -self.dy,
+            dz: -self.dz,
+        }
     }
 }
 
