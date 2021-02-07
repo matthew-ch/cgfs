@@ -52,36 +52,30 @@ impl Canvas {
         }
     }
 
-    pub fn render(&mut self, scene: &Scene, depth: u32) {
-        let o = Point::default();
+    pub fn render(&mut self, scene: &Scene, depth: u32, n: u16) {
         let width = self.width;
         let height = self.height;
         for x in 0..width {
             for y in 0..height {
-                let d = scene.canvas_to_viewport(x, y, width, height);
-                let ray = Ray { origin: o, direction: d - o };
-                self.set_pixel(x, y, scene.trace_ray(&ray, 1.0, f64::INFINITY, depth));
+                self.super_sampling(x, y, n, scene, depth);
             }
         }
     }
 
-    pub fn render_mth(&mut self, scene: &Scene, depth: u32) {
-        let o = Point::default();
+    pub fn render_mth(&mut self, scene: &Scene, ts: u16, depth: u32, n: u16) {
         let mut v = Vec::new();
-        for i in 0..4 {
+        for i in 0..ts {
             let scene = unsafe { Box::new(mem::transmute::<_, &'static Scene>(scene)) };
             let canvas = unsafe { Box::new(mem::transmute::<_, &'static mut Canvas>(&mut *self)) };
             let width = self.width;
             let height = self.height;
             v.push(thread::spawn(move || {
                 for x in 0..width {
-                    if x % 4 != i {
+                    if x % ts != i {
                         continue;
                     }
                     for y in 0..height {
-                        let d = scene.canvas_to_viewport(x, y, width, height);
-                        let ray = Ray { origin: o, direction: d - o };
-                        canvas.set_pixel(x, y, scene.trace_ray(&ray, 1.0, f64::INFINITY, depth));
+                        canvas.super_sampling(x, y, n, &scene, depth);
                     }
                 }
             }));
@@ -90,32 +84,52 @@ impl Canvas {
             t.join().unwrap();
         }
     }
+
+    fn super_sampling(&mut self, x: u16, y: u16, n: u16, scene: &Scene, depth: u32) {
+        let mut color = Color::black();
+        for i in 0..n {
+            for j in 0..n {
+                let ray = scene.canvas_to_viewport(x * n + i, y * n + j, self.width * n, self.height * n);
+                color = color + scene.trace_ray(&ray, 1.0, f64::INFINITY, depth);
+            }
+        }
+        self.set_pixel(x, y, color * (1. / (n * n) as f64));
+    }
 }
 
 pub struct Scene {
     viewport_width: f64,
     viewport_height: f64,
-    distance_to_camera: f64,
     background: Color,
     objects: Vec<Box<dyn SceneObject + Sync>>,
     lights: Vec<Box<dyn LightObject + Sync>>,
+    camera_position: Point,
+    camera_rotation: Matrix,
+    camera_distance: f64,
 }
 
 impl Scene {
     pub fn new(
         viewport_width: f64,
         viewport_height: f64,
-        distance_to_camera: f64,
         background: Color,
     ) -> Self {
         Scene {
             viewport_width,
             viewport_height,
-            distance_to_camera,
             background,
             objects: Vec::new(),
             lights: Vec::new(),
+            camera_position: Point::default(),
+            camera_rotation: Matrix::identity(),
+            camera_distance: 1.,
         }
+    }
+
+    pub fn set_camera(&mut self, position: Point, rotation: Matrix, distance: f64) {
+        self.camera_position = position;
+        self.camera_rotation = rotation;
+        self.camera_distance = distance;
     }
 
     pub fn add_object(&mut self, object: Box<dyn SceneObject + Sync>) {
@@ -126,11 +140,14 @@ impl Scene {
         self.lights.push(light);
     }
 
-    pub fn canvas_to_viewport(&self, x: u16, y: u16, width: u16, height: u16) -> Point {
-        Point {
-            x: (x as f64 / width as f64 - 0.5) * self.viewport_width,
-            y: (0.5 - y as f64 / height as f64) * self.viewport_height,
-            z: self.distance_to_camera,
+    pub fn canvas_to_viewport(&self, x: u16, y: u16, width: u16, height: u16) -> Ray {
+        Ray {
+            origin: self.camera_position,
+            direction: self.camera_rotation.dot(&Vector {
+                dx: (x as f64 / width as f64 - 0.5) * self.viewport_width,
+                dy: (0.5 - y as f64 / height as f64) * self.viewport_height,
+                dz: self.camera_distance,
+            })
         }
     }
 

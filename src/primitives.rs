@@ -1,4 +1,4 @@
-use std::ops::{Add, Div, Mul, Neg, Sub};
+use std::ops::{Add, Div, Index, Mul, Neg, Sub};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Color {
@@ -203,4 +203,88 @@ impl Neg for Vector {
 pub struct Ray {
     pub origin: Point,
     pub direction: Vector,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Matrix([Vector; 3]);
+
+impl Index<usize> for Matrix {
+    type Output = Vector;
+
+    fn index(&self, index: usize) -> &Vector {
+        &self.0[index]
+    }
+}
+
+impl Matrix {
+    pub fn identity() -> Self {
+        Matrix([
+            Vector { dx: 1., dy: 0., dz: 0., },
+            Vector { dx: 0., dy: 1., dz: 0. },
+            Vector { dx: 0., dy: 0., dz: 1. },
+        ])
+    }
+
+    pub fn rotate_x(deg: f64) -> Self {
+        let (sin, cos) = deg.to_radians().sin_cos();
+
+        Matrix([
+            Vector { dx: 1., dy: 0., dz: 0. },
+            Vector { dx: 0., dy: cos, dz: sin },
+            Vector { dx: 0., dy: -sin, dz: cos },
+        ])
+    }
+
+    pub fn rotate_y(deg: f64) -> Self {
+        let (sin, cos) = deg.to_radians().sin_cos();
+
+        Matrix([
+            Vector { dx: cos, dy: 0., dz: -sin },
+            Vector { dx: 0., dy: 1., dz: 0. },
+            Vector { dx: sin, dy: 0., dz: cos },
+        ])
+    }
+
+    pub fn rotate_z(deg: f64) -> Self {
+        let (sin, cos) = deg.to_radians().sin_cos();
+
+        Matrix([
+            Vector { dx: cos, dy: sin, dz: 0. },
+            Vector { dx: -sin, dy: cos, dz: 0. },
+            Vector { dx: 0., dy: 0., dz: 1. }
+        ])
+    }
+
+    pub fn compose(m: &Vec<Matrix>) -> Matrix {
+        m.iter().fold(Self::identity(), |acc, &x| acc * x)
+    }
+
+    pub fn transpose(&self) -> Matrix {
+        Matrix([
+            Vector { dx: self[0].dx, dy: self[1].dx, dz: self[2].dx },
+            Vector { dx: self[0].dy, dy: self[1].dy, dz: self[2].dy },
+            Vector { dx: self[0].dz, dy: self[1].dz, dz: self[2].dz },
+        ])
+    }
+
+    pub fn dot(&self, rhs: &Vector) -> Vector {
+        Vector {
+            dx: self[0].dot(rhs),
+            dy: self[1].dot(rhs),
+            dz: self[2].dot(rhs),
+        }
+    }
+}
+
+impl Mul<Matrix> for Matrix {
+    type Output = Matrix;
+
+    fn mul(self, rhs: Matrix) -> Matrix {
+        let t = rhs.transpose();
+        Matrix([
+            Vector { dx: self[0].dot(&t[0]), dy: self[0].dot(&t[1]), dz: self[0].dot(&t[2]) },
+            Vector { dx: self[1].dot(&t[0]), dy: self[1].dot(&t[1]), dz: self[1].dot(&t[2]) },
+            Vector { dx: self[2].dot(&t[0]), dy: self[2].dot(&t[1]), dz: self[2].dot(&t[2]) },
+        ])
+    }
 }
