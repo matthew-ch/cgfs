@@ -19,47 +19,59 @@ fn save_canvas_to(canvas: &Canvas, p: &str) {
 
 fn main() {
     let mut canvas = Canvas::new(600, 600, Color::black());
-    let mut scene = Scene::new(1., 1., Color::black());
-    scene.add_object(Box::new(Sphere {
-        center: Point {
-            x: 0.,
-            y: -1.5,
-            z: 3.,
+    let mut scene = Scene::new(1., 1., Color { r: 225., g: 230., b: 252. });
+    
+    let red_sphere = SphereObject {
+        sphere: Sphere {
+            center: Point {
+                x: 0.,
+                y: -1.5,
+                z: 3.,
+            },
+            radius: 1.,
         },
-        radius: 1.,
         color: Color::red(),
         specular: 500,
         reflective: 0.2,
-    }));
-    scene.add_object(Box::new(Sphere {
-        center: Point {
-            x: 2.,
-            y: 1.,
-            z: 4.,
+    };
+
+    let blue_sphere = SphereObject {
+        sphere: Sphere {
+            center: Point {
+                x: 2.,
+                y: 1.,
+                z: 4.,
+            },
+            radius: 1.,
         },
-        radius: 1.,
         color: Color::blue(),
         specular: 500,
-        reflective: 0.5,
-    }));
-    scene.add_object(Box::new(Sphere {
-        center: Point {
-            x: -2.,
-            y: 0.,
-            z: 4.,
+        reflective: 0.2,
+    };
+
+    let green_sphere = SphereObject {
+        sphere: Sphere {
+            center: Point {
+                x: -2.,
+                y: 0.,
+                z: 4.,
+            },
+            radius: 1.,
         },
-        radius: 1.,
         color: Color::green(),
         specular: 10,
         reflective: 0.4,
-    }));
-    scene.add_object(Box::new(Sphere {
-        center: Point {
-            x: 0.,
-            y: -5001.,
-            z: 0.,
+    };
+
+    let yellow_sphere = SphereObject {
+        sphere: Sphere {
+            center: Point {
+                x: 0.,
+                y: -5001.,
+                z: 0.,
+            },
+            radius: 5000.,
         },
-        radius: 5000.,
         color: Color {
             r: 255.,
             g: 255.,
@@ -67,7 +79,99 @@ fn main() {
         },
         specular: 1000,
         reflective: 0.2,
-    }));
+    };
+
+    scene.add_object(Box::new(red_sphere));
+    scene.add_object(Box::new(blue_sphere));
+    scene.add_object(Box::new(green_sphere));
+    scene.add_object(Box::new(yellow_sphere));
+
+    let subtraction = BooleanOperationSpheresObject {
+        sphere_a: Sphere {
+            center: Point {
+                x: 0.,
+                y: 3.,
+                z: 5.,
+            },
+            radius: 1.5,
+        },
+        operation: BooleanOperation::SUBTRACTION,
+        sphere_b: Sphere {
+            center: Point {
+                x: 0.,
+                y: 4.,
+                z: 3.,
+            },
+            radius: 1.5,
+        },
+        color: Color {
+            r: 0.,
+            g: 255.,
+            b: 255.,
+        },
+        specular: 50,
+        reflective: 0.1,
+    };
+
+    scene.add_object(Box::new(subtraction));
+
+    let intersection = BooleanOperationSpheresObject {
+        sphere_a: Sphere {
+            center: Point {
+                x: -1.0,
+                y: 2.0,
+                z: 2.0,
+            },
+            radius: 0.6,
+        },
+        operation: BooleanOperation::INTERSECTION,
+        sphere_b: Sphere {
+            center: Point {
+                x: -1.4,
+                y: 1.8,
+                z: 1.9,
+            },
+            radius: 0.5,
+        },
+        color: Color {
+            r: 255.,
+            g: 0.,
+            b: 255.,
+        },
+        specular: 100,
+        reflective: 0.2,
+    };
+
+    scene.add_object(Box::new(intersection));
+
+    let union = BooleanOperationSpheresObject {
+        sphere_a: Sphere {
+            center: Point {
+                x: 0.4,
+                y: 1.0,
+                z: 2.5,
+            },
+            radius: 0.6,
+        },
+        operation: BooleanOperation::UNION,
+        sphere_b: Sphere {
+            center: Point {
+                x: 0.3,
+                y: 0.8,
+                z: 2.3,
+            },
+            radius: 0.5,
+        },
+        color: Color {
+            r: 128.,
+            g: 128.,
+            b: 128.,
+        },
+        specular: 20,
+        reflective: 0.4,
+    };
+
+    scene.add_object(Box::new(union));
 
     scene.add_light(Box::new(AmbientLight { intensity: 0.2 }));
     scene.add_light(Box::new(PointLight {
@@ -88,13 +192,13 @@ fn main() {
     }));
 
     scene.set_camera(
-        Point { x: 3.0, y: 1.5, z: -6.0 },
+        Point { x: 1.5, y: 1.0, z: -6.0 },
         Matrix::compose(&vec![
-            Matrix::rotate_x(-10.),
-            Matrix::rotate_y(15.),
+            Matrix::rotate_x(5.),
+            Matrix::rotate_y(5.),
             Matrix::rotate_z(10.),
         ]),
-        2.0,
+        1.5,
     );
 
     // let t1 = std::time::SystemTime::now();

@@ -1,4 +1,5 @@
-use crate::{Scene, primitives::*};
+use std::ops::RangeInclusive;
+use crate::{EPS, Scene, primitives::*};
 
 #[derive(Clone, Copy, Debug)]
 pub struct HitTestResult {
@@ -11,49 +12,145 @@ pub struct HitTestResult {
 }
 
 pub trait SceneObject {
-    fn hit_test(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitTestResult>;
+    fn hit_test(&self, ray: &Ray, t_range: &RangeInclusive<f64>) -> Option<HitTestResult>;
 }
 
-pub struct Sphere {
-    pub center: Point,
-    pub radius: f64,
+pub struct SphereObject {
+    pub sphere: Sphere,
     pub color: Color,
     pub specular: i32,
     pub reflective: f64,
 }
 
-impl SceneObject for Sphere {
-    fn hit_test(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitTestResult> {
-        let co: Vector = ray.origin - self.center;
-        let a = ray.direction.dot(&ray.direction);
-        let b = 2.0 * co.dot(&ray.direction);
-        let c = co.dot(&co) - self.radius * self.radius;
+impl SceneObject for SphereObject {
+    fn hit_test(&self, ray: &Ray, t_range: &RangeInclusive<f64>) -> Option<HitTestResult> {
+        let (t1, t2) = self.sphere.compute_ray_intersection(ray)?;
+        for &t in [t1, t2].iter() {
+            if t_range.contains(&t) {
+                let point: Point = ray.origin + ray.direction * t;
+                let normal: Vector = point - self.sphere.center;
+                return Some(HitTestResult {
+                    t,
+                    color: self.color,
+                    point,
+                    normal: normal / normal.length(),
+                    specular: self.specular,
+                    reflective: self.reflective,
+                });
+            }
+        }
+        None
+    }
+}
 
-        let discriminant = b * b - 4.0 * a * c;
-        if discriminant < 0.0 {
+pub enum BooleanOperation {
+    UNION,
+    INTERSECTION,
+    SUBTRACTION
+}
+
+pub struct BooleanOperationSpheresObject {
+    pub sphere_a: Sphere,
+    pub operation: BooleanOperation,
+    pub sphere_b: Sphere,
+    pub color: Color,
+    pub specular: i32,
+    pub reflective: f64,
+}
+
+impl SceneObject for BooleanOperationSpheresObject {
+    fn hit_test(&self, ray: &Ray, t_range: &RangeInclusive<f64>) -> Option<HitTestResult> {
+        let ta = self.sphere_a.compute_ray_intersection(ray);
+        let tb = self.sphere_b.compute_ray_intersection(ray);
+        if ta.is_none() && tb.is_none() {
             return None;
         }
-        let t1 = (-b - discriminant.sqrt()) / (2.0 * a);
-        let t2 = (-b + discriminant.sqrt()) / (2.0 * a);
-        let st = if t1 >= t_min && t1 < t_max {
-            Some(t1)
-        } else if t2 >= t_min && t2 < t_max {
-            Some(t2)
-        } else {
-            None
+        let range_a = ta.unwrap_or((-f64::INFINITY, -f64::INFINITY));
+        let range_b = tb.unwrap_or((-f64::INFINITY, -f64::INFINITY));
+        let has_no_intersection = range_b.0 > range_a.1 || range_a.0 > range_b.1;
+        let break_points: Vec<(f64, &Sphere)> = match self.operation {
+            BooleanOperation::UNION => {
+                if has_no_intersection {
+                    if range_b.0 > range_a.1 {
+                        vec![
+                            (range_a.0, &self.sphere_a),
+                            (range_a.1, &self.sphere_a),
+                            (range_b.0, &self.sphere_b),
+                            (range_b.1, &self.sphere_b),
+                        ]
+                    } else {
+                        vec![
+                            (range_b.0, &self.sphere_b),
+                            (range_b.1, &self.sphere_b),
+                            (range_a.0, &self.sphere_a),
+                            (range_a.1, &self.sphere_a),
+                        ]
+                    }
+
+                } else {
+                    vec![
+                        if range_a.0 < range_b.0 { (range_a.0, &self.sphere_a) } else { (range_b.0, &self.sphere_b) },
+                        if range_a.1 < range_b.1 { (range_b.1, &self.sphere_b) } else { (range_a.1, &self.sphere_a) },
+                    ]
+                }
+            },
+            BooleanOperation::INTERSECTION => {
+                if has_no_intersection {
+                    Vec::new()
+                } else {
+                    vec![
+                        if range_a.0 < range_b.0 { (range_b.0, &self.sphere_b) } else { (range_a.0, &self.sphere_a) },
+                        if range_a.1 < range_b.1 { (range_a.1, &self.sphere_a) } else { (range_b.1, &self.sphere_b) },
+                    ]
+                }
+            },
+            BooleanOperation::SUBTRACTION => {
+                if has_no_intersection {
+                    vec![
+                        (range_a.0, &self.sphere_a),
+                        (range_a.1, &self.sphere_a),
+                    ]
+                } else if range_b.0 > range_a.0 {
+                    if range_b.1 >= range_a.1 {
+                        vec![
+                            (range_a.0, &self.sphere_a),
+                            (range_b.0, &self.sphere_b),
+                        ]
+                    } else {
+                        vec![
+                            (range_a.0, &self.sphere_a),
+                            (range_b.0, &self.sphere_b),
+                            (range_b.1, &self.sphere_a),
+                            (range_a.1, &self.sphere_a),
+                        ]
+                    }
+                } else if range_b.1 < range_a.1 {
+                    vec![
+                        (range_b.1, &self.sphere_b),
+                        (range_a.1, &self.sphere_a),
+                    ]
+                } else {
+                    Vec::new()
+                }
+            },
         };
-        st.map(|t| {
-            let point: Point = ray.origin + ray.direction * t;
-            let normal: Vector = point - self.center;
-            HitTestResult {
-                t,
-                color: self.color,
-                point,
-                normal: normal / normal.length(),
-                specular: self.specular,
-                reflective: self.reflective,
+
+        for b in break_points {
+            if t_range.contains(&b.0) {
+                let point = ray.origin + ray.direction * b.0;
+                let normal: Vector = point - b.1.center;
+                return Some(HitTestResult {
+                    t: b.0,
+                    point,
+                    color: self.color,
+                    normal: normal / normal.length(),
+                    specular: self.specular,
+                    reflective: self.reflective,
+                })
             }
-        })
+        }
+
+        None
     }
 }
 
@@ -87,7 +184,7 @@ pub struct PointLight {
 impl LightObject for PointLight {
     fn intensity_from(&self, scene: &Scene, point: &Point, normal: &Vector, view: &Vector, specular: i32) -> f64 {
         let light: Vector = self.position - *point;
-        if scene.hit_test(&Ray { origin: *point, direction: light }, 0.001, 1.0).is_some() {
+        if scene.hit_test(&Ray { origin: *point, direction: light }, &(EPS..=1.0)).is_some() {
             0.
         } else {
             self.intensity * compute_light_factor(normal, &light, view, specular)
@@ -102,7 +199,7 @@ pub struct DirectionalLight {
 
 impl LightObject for DirectionalLight {
     fn intensity_from(&self, scene: &Scene, point: &Point, normal: &Vector, view: &Vector, specular: i32) -> f64 {
-        if scene.hit_test(&Ray { origin: *point, direction: self.direction }, 0.001, f64::INFINITY).is_some() {
+        if scene.hit_test(&Ray { origin: *point, direction: self.direction }, &(EPS..=f64::INFINITY)).is_some() {
             0.
         } else {
             self.intensity * compute_light_factor(normal, &self.direction, view, specular)
