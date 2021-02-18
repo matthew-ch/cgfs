@@ -7,6 +7,7 @@ use std::mem;
 use std::ops::RangeInclusive;
 
 pub(crate) const EPS: f64 = 0.001;
+pub(crate) const AIR_REFRACTION_INDEX: f64 = 1.0;
 
 pub struct Canvas {
     width: u16,
@@ -93,7 +94,7 @@ impl Canvas {
         for i in 0..n {
             for j in 0..n {
                 let ray = scene.canvas_to_viewport(x * n + i, y * n + j, self.width * n, self.height * n);
-                color = color + scene.trace_ray(&ray, 1.0..=f64::INFINITY, depth);
+                color = color + scene.trace_ray(&ray, AIR_REFRACTION_INDEX, 1.0..=f64::INFINITY, depth);
             }
         }
         self.set_pixel(x, y, color * (1. / (n * n) as f64));
@@ -174,23 +175,65 @@ impl Scene {
         result
     }
 
-    pub fn trace_ray(&self, ray: &Ray, t_range: RangeInclusive<f64>, depth: u32) -> Color {
+    fn container_hit_test(&self, ray: &Ray, t_range: &RangeInclusive<f64>) -> Option<HitTestResult> {
+        let mut result: Option<HitTestResult> = None;
+
+        for object in self.objects.iter() {
+            if let Some(r) = object.hit_test(ray, &t_range) {
+                if r.normal.dot(&ray.direction) <= 0. {
+                    continue;
+                }
+                if result.is_none() {
+                    result = Some(r)
+                } else if r.t < result.unwrap().t {
+                    result = Some(r)
+                }
+            }
+        }
+
+        result
+    }
+
+    pub fn trace_ray(&self, ray: &Ray, refraction_index: f64, t_range: RangeInclusive<f64>, depth: u32) -> Color {
         let result = self.hit_test(ray, &t_range);
 
-        result.map_or(self.background, |mut hit| {
-            if hit.normal.dot(&ray.direction) > 0. {
-                hit.normal = - hit.normal;
-            }
-            let local_color: Color = hit.material.color * self.compute_lighting(&hit.point, &hit.normal, &(-ray.direction), hit.material.specular);
-            if depth == 0 || hit.material.reflective <= 0. {
-                local_color
+        result.map_or(self.background, |hit| {
+            let opaque_color = {
+                let local_color: Color = hit.material.color * self.compute_lighting(&hit.point, &hit.normal, &(-ray.direction), hit.material.specular);
+                if depth == 0 || hit.material.reflective <= 0. {
+                    local_color
+                } else {
+                    let reflected_ray = Ray {
+                        origin: hit.point,
+                        direction: hit.normal.reflect(&(-ray.direction))
+                    };
+                    let reflected_color = self.trace_ray(&reflected_ray, 1.0, EPS..=f64::INFINITY, depth - 1);
+                    local_color * (1. - hit.material.reflective) + reflected_color * hit.material.reflective
+                }
+            };
+            if depth == 0 || hit.material.transparency.is_none() {
+                opaque_color
             } else {
-                let reflected_ray = Ray {
-                    origin: hit.point,
-                    direction: hit.normal.reflect(&(-ray.direction))
+                let in_vector = ray.direction / ray.direction.length();
+                let going_outside_object = hit.normal.dot(&in_vector) > 0.;
+                let new_refraction_index = if going_outside_object {
+                    self.container_hit_test(&Ray { origin: hit.point, direction: ray.direction }, &(EPS..=f64::INFINITY))
+                    .map(|container_hit| container_hit.material.transparency)
+                    .flatten().unwrap_or(AIR_REFRACTION_INDEX)
+                } else {
+                    hit.material.transparency.unwrap()
                 };
-                let reflected_color = self.trace_ray(&reflected_ray, EPS..=f64::INFINITY, depth - 1);
-                local_color * (1. - hit.material.reflective) + reflected_color * hit.material.reflective
+                let normal = if going_outside_object { -hit.normal } else { hit.normal };
+                let cos = normal.dot(&in_vector);
+                let k = refraction_index / new_refraction_index;
+                let d = 1. - k * k * (1. - cos * cos);
+                if d < 0. {
+                    opaque_color
+                } else {
+                    let refraction_vector: Vector = (in_vector - normal * cos) * k - normal * d.sqrt();
+                    let p = cos.abs().sqrt();
+                    opaque_color * (1. - p) + self.trace_ray(&Ray { origin: hit.point, direction: refraction_vector }, new_refraction_index, EPS..=f64::INFINITY, depth - 1) * p
+                }
             }
         })
     }

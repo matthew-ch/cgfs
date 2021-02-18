@@ -34,6 +34,7 @@ fn main() {
             color: Color::red(),
             specular: 500,
             reflective: 0.2,
+            transparency: None,
         },
     };
 
@@ -50,6 +51,7 @@ fn main() {
             color: Color::blue(),
             specular: 500,
             reflective: 0.2,
+            transparency: None,
         },
     };
 
@@ -66,6 +68,7 @@ fn main() {
             color: Color::green(),
             specular: 10,
             reflective: 0.4,
+            transparency: None,
         },
     };
 
@@ -86,6 +89,7 @@ fn main() {
             },
             specular: 1000,
             reflective: 0.2,
+            transparency: None,
         },
     };
 
@@ -120,6 +124,7 @@ fn main() {
             },
             specular: 50,
             reflective: 0.1,
+            transparency: None,
         },
     };
 
@@ -151,6 +156,7 @@ fn main() {
             },
             specular: 100,
             reflective: 0.2,
+            transparency: None,
         },
     };
 
@@ -182,6 +188,7 @@ fn main() {
             },
             specular: 20,
             reflective: 0.4,
+            transparency: None,
         },
     };
 
@@ -215,13 +222,33 @@ fn main() {
         1.5,
     );
 
+    let lense = BooleanOperationSpheresObject {
+        sphere_a: Sphere {
+            center: Point { x: 0.5, y: 1.0, z: -0.5 },
+            radius: 1.,
+        },
+        operation: BooleanOperation::INTERSECTION,
+        sphere_b: Sphere {
+            center: Point { x: 0.5, y: 1.5, z: -1.5 },
+            radius: 1.,
+        },
+        material: Material {
+            color: Color::black(),
+            transparency: Some(1.01),
+            reflective: 0.5,
+            specular: 100,
+        },
+    };
+
+    scene.add_object(Box::new(lense));
+
     // let t1 = std::time::SystemTime::now();
     // canvas.render(&scene, 3, 3);
     // let t2 = std::time::SystemTime::now();
     // println!("single thread render time: {:?}", t2.duration_since(t1));
 
     let t1 = std::time::SystemTime::now();
-    canvas.render_mth(&scene, 3, 3, 3);
+    canvas.render_mth(&scene, 3, 5, 3);
     let t2 = std::time::SystemTime::now();
     println!("multi thread render time: {:?}", t2.duration_since(t1));
     save_canvas_to(&canvas, r"./output.png");

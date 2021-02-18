@@ -327,4 +327,5 @@ pub struct Material {
     pub color: Color,
     pub specular: i32,
     pub reflective: f64,
+    pub transparency: Option<f64>,
 }

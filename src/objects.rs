@@ -127,10 +127,17 @@ impl SceneObject for BooleanOperationSpheresObject {
             },
         };
 
-        for b in break_points {
+        for (i, b) in break_points.into_iter().enumerate() {
             if t_range.contains(&b.0) {
                 let point = ray.origin + ray.direction * b.0;
-                let normal: Vector = point - b.1.center;
+                let mut normal: Vector = point - b.1.center;
+                let flip = {
+                    let f = normal.dot(&ray.direction);
+                    if i % 2 == 1 { f < 0. } else { f > 0. }
+                };
+                if flip {
+                    normal = -normal;
+                }
                 return Some(HitTestResult {
                     t: b.0,
                     point,
