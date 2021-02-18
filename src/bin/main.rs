@@ -30,9 +30,11 @@ fn main() {
             },
             radius: 1.,
         },
-        color: Color::red(),
-        specular: 500,
-        reflective: 0.2,
+        material: Material{
+            color: Color::red(),
+            specular: 500,
+            reflective: 0.2,
+        },
     };
 
     let blue_sphere = SphereObject {
@@ -44,9 +46,11 @@ fn main() {
             },
             radius: 1.,
         },
-        color: Color::blue(),
-        specular: 500,
-        reflective: 0.2,
+        material: Material {
+            color: Color::blue(),
+            specular: 500,
+            reflective: 0.2,
+        },
     };
 
     let green_sphere = SphereObject {
@@ -58,9 +62,11 @@ fn main() {
             },
             radius: 1.,
         },
-        color: Color::green(),
-        specular: 10,
-        reflective: 0.4,
+        material: Material {
+            color: Color::green(),
+            specular: 10,
+            reflective: 0.4,
+        },
     };
 
     let yellow_sphere = SphereObject {
@@ -72,13 +78,15 @@ fn main() {
             },
             radius: 5000.,
         },
-        color: Color {
-            r: 255.,
-            g: 255.,
-            b: 0.,
+        material: Material {
+            color: Color {
+                r: 255.,
+                g: 255.,
+                b: 0.,
+            },
+            specular: 1000,
+            reflective: 0.2,
         },
-        specular: 1000,
-        reflective: 0.2,
     };
 
     scene.add_object(Box::new(red_sphere));
@@ -104,13 +112,15 @@ fn main() {
             },
             radius: 1.5,
         },
-        color: Color {
-            r: 0.,
-            g: 255.,
-            b: 255.,
+        material: Material {
+            color: Color {
+                r: 0.,
+                g: 255.,
+                b: 255.,
+            },
+            specular: 50,
+            reflective: 0.1,
         },
-        specular: 50,
-        reflective: 0.1,
     };
 
     scene.add_object(Box::new(subtraction));
@@ -133,13 +143,15 @@ fn main() {
             },
             radius: 0.5,
         },
-        color: Color {
-            r: 255.,
-            g: 0.,
-            b: 255.,
+        material: Material {
+            color: Color {
+                r: 255.,
+                g: 0.,
+                b: 255.,
+            },
+            specular: 100,
+            reflective: 0.2,
         },
-        specular: 100,
-        reflective: 0.2,
     };
 
     scene.add_object(Box::new(intersection));
@@ -162,13 +174,15 @@ fn main() {
             },
             radius: 0.5,
         },
-        color: Color {
-            r: 128.,
-            g: 128.,
-            b: 128.,
+        material: Material {
+            color: Color {
+                r: 128.,
+                g: 128.,
+                b: 128.,
+            },
+            specular: 20,
+            reflective: 0.4,
         },
-        specular: 20,
-        reflective: 0.4,
     };
 
     scene.add_object(Box::new(union));

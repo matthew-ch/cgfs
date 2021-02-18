@@ -1,14 +1,12 @@
 use std::ops::RangeInclusive;
-use crate::{EPS, Scene, primitives::*};
+use crate::{EPS, Scene, components::*};
 
 #[derive(Clone, Copy, Debug)]
 pub struct HitTestResult {
     pub t: f64,
-    pub color: Color,
     pub point: Point,
     pub normal: Vector,
-    pub specular: i32,
-    pub reflective: f64,
+    pub material: Material,
 }
 
 pub trait SceneObject {
@@ -17,9 +15,7 @@ pub trait SceneObject {
 
 pub struct SphereObject {
     pub sphere: Sphere,
-    pub color: Color,
-    pub specular: i32,
-    pub reflective: f64,
+    pub material: Material,
 }
 
 impl SceneObject for SphereObject {
@@ -31,11 +27,9 @@ impl SceneObject for SphereObject {
                 let normal: Vector = point - self.sphere.center;
                 return Some(HitTestResult {
                     t,
-                    color: self.color,
                     point,
                     normal: normal / normal.length(),
-                    specular: self.specular,
-                    reflective: self.reflective,
+                    material: self.material,
                 });
             }
         }
@@ -53,9 +47,7 @@ pub struct BooleanOperationSpheresObject {
     pub sphere_a: Sphere,
     pub operation: BooleanOperation,
     pub sphere_b: Sphere,
-    pub color: Color,
-    pub specular: i32,
-    pub reflective: f64,
+    pub material: Material,
 }
 
 impl SceneObject for BooleanOperationSpheresObject {
@@ -142,10 +134,8 @@ impl SceneObject for BooleanOperationSpheresObject {
                 return Some(HitTestResult {
                     t: b.0,
                     point,
-                    color: self.color,
                     normal: normal / normal.length(),
-                    specular: self.specular,
-                    reflective: self.reflective,
+                    material: self.material,
                 })
             }
         }

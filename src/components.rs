@@ -86,11 +86,21 @@ impl Mul<f64> for Color {
     }
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy)]
 pub struct Point {
     pub x: f64,
     pub y: f64,
     pub z: f64,
+}
+
+impl Point {
+    pub const fn zero() -> Self {
+        Point {
+            x: 0.,
+            y: 0.,
+            z: 0.,
+        }
+    }
 }
 
 impl Sub for Point {
@@ -117,7 +127,7 @@ impl Add<Vector> for Point {
     }
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy)]
 pub struct Vector {
     pub dx: f64,
     pub dy: f64,
@@ -199,7 +209,7 @@ impl Neg for Vector {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Ray {
     pub origin: Point,
     pub direction: Vector,
@@ -289,7 +299,7 @@ impl Mul<Matrix> for Matrix {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct Sphere {
     pub center: Point,
     pub radius: f64,
@@ -310,4 +320,11 @@ impl Sphere {
         let t2 = (-b + discriminant.sqrt()) / (2.0 * a);
         Some((t1, t2))
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Material {
+    pub color: Color,
+    pub specular: i32,
+    pub reflective: f64,
 }

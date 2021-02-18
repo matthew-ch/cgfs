@@ -1,6 +1,6 @@
-mod primitives;
+mod components;
 mod objects;
-pub use primitives::*;
+pub use components::*;
 pub use objects::*;
 use std::thread;
 use std::mem;
@@ -123,7 +123,7 @@ impl Scene {
             background,
             objects: Vec::new(),
             lights: Vec::new(),
-            camera_position: Point::default(),
+            camera_position: Point::zero(),
             camera_rotation: Matrix::identity(),
             camera_distance: 1.,
         }
@@ -181,8 +181,8 @@ impl Scene {
             if hit.normal.dot(&ray.direction) > 0. {
                 hit.normal = - hit.normal;
             }
-            let local_color: Color = hit.color * self.compute_lighting(&hit.point, &hit.normal, &(-ray.direction), hit.specular);
-            if depth == 0 || hit.reflective <= 0. {
+            let local_color: Color = hit.material.color * self.compute_lighting(&hit.point, &hit.normal, &(-ray.direction), hit.material.specular);
+            if depth == 0 || hit.material.reflective <= 0. {
                 local_color
             } else {
                 let reflected_ray = Ray {
@@ -190,7 +190,7 @@ impl Scene {
                     direction: hit.normal.reflect(&(-ray.direction))
                 };
                 let reflected_color = self.trace_ray(&reflected_ray, EPS..=f64::INFINITY, depth - 1);
-                local_color * (1. - hit.reflective) + reflected_color * hit.reflective
+                local_color * (1. - hit.material.reflective) + reflected_color * hit.material.reflective
             }
         })
     }
