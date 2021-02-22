@@ -151,6 +151,32 @@ impl SceneObject for BooleanOperationSpheresObject {
     }
 }
 
+pub struct PolyhedronObject {
+    pub triangles: Vec<Triangle>,
+    pub material: Material,
+}
+
+impl SceneObject for PolyhedronObject {
+    fn hit_test(&self, ray: &Ray, t_range: &RangeInclusive<f64>) -> Option<HitTestResult> {
+        let mut hits = self.triangles.iter()
+            .flat_map(|triangle| triangle.compute_ray_intersection(ray).map(|t| (t, triangle.normal)))
+            .collect::<Vec<_>>();
+        hits.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        for hit in hits {
+            if t_range.contains(&hit.0) {
+                let point: Point = ray.origin + ray.direction * hit.0;
+                return Some(HitTestResult{
+                    t: hit.0,
+                    point,
+                    normal: hit.1,
+                    material: self.material,
+                });
+            }
+        }
+        None
+    }
+}
+
 pub trait LightObject {
     fn intensity_from(&self, scene: &Scene, point: &Point, normal: &Vector, view: &Vector, specular: i32) -> f64;
 }

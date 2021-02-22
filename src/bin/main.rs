@@ -222,6 +222,30 @@ fn main() {
         1.5,
     );
 
+    let vertices = [
+        Point { x: 0., y: 2., z: 0.},
+        Point { x: 3., y: 5., z: 5.},
+        Point { x: 0., y: 3.5, z: -1.},
+        Point { x: -3., y: 5., z: 5.},
+    ];
+
+    let polyhedron = PolyhedronObject {
+        triangles: vec![
+            Triangle::new(vertices[0], vertices[1], vertices[2]),
+            Triangle::new(vertices[0], vertices[2], vertices[3]),
+            Triangle::new(vertices[0], vertices[3], vertices[1]),
+            Triangle::new(vertices[1], vertices[3], vertices[2]),
+        ],
+        material: Material {
+            color: Color::black(),
+            reflective: 0.8,
+            specular: 300,
+            transparency: Some(1.02),
+        },
+    };
+
+    scene.add_object(Box::new(polyhedron));
+
     let lense = BooleanOperationSpheresObject {
         sphere_a: Sphere {
             center: Point { x: 0.5, y: 1.0, z: -0.5 },

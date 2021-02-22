@@ -329,3 +329,83 @@ pub struct Material {
     pub reflective: f64,
     pub transparency: Option<f64>,
 }
+
+pub struct Triangle {
+    pub a: Point,
+    pub b: Point,
+    pub c: Point,
+    pub normal: Vector,
+}
+
+fn solve_equations(mut coefficients: [[f64; 3]; 3], mut rhs: [f64; 3]) -> Option<[f64; 3]> {
+    for i in 0..3 {
+        if coefficients[i][i] == 0. {
+            for j in (i+1)..3 {
+                if coefficients[j][i] != 0. {
+                    let temp = coefficients[i];
+                    coefficients[i] = coefficients[j];
+                    coefficients[j] = temp;
+                    let temp = rhs[i];
+                    rhs[i] = rhs[j];
+                    rhs[j] = temp;
+                }
+                break;
+            }
+        }
+        if coefficients[i][i] == 0. {
+            return None
+        }
+        let c = coefficients[i][i];
+        for j in i..3 {
+            coefficients[i][j] /= c;
+        }
+        rhs[i] /= c;
+        for j in 0..3 {
+            if j == i {
+                continue;
+            }
+            let c = coefficients[j][i];
+            for k in i..3 {
+                coefficients[j][k] -= c * coefficients[i][k];
+            }
+            rhs[j] -= c * rhs[i];
+        }
+    }
+    for i in 0..3 {
+        if coefficients[i][i] != 1. {
+            return None
+        }
+    }
+    Some(rhs)
+}
+
+impl Triangle {
+    pub fn new(a: Point, b: Point, c: Point) -> Triangle {
+        let v: Vector = c - a;
+        let w: Vector = b - a;
+        let cross = Vector {
+            dx: v.dy * w.dz - v.dz * w.dy,
+            dy: v.dz * w.dx - v.dx * w.dz,
+            dz: v.dx * w.dy - v.dy * w.dx,
+        };
+        Triangle {
+            a,
+            b,
+            c,
+            normal: cross / cross.length(),
+        }
+    }
+
+    pub fn compute_ray_intersection(&self, ray: &Ray) -> Option<f64> {
+        let ab: Vector = self.b - self.a;
+        let ac: Vector = self.c - self.a;
+        let ao: Vector = ray.origin - self.a;
+        solve_equations([
+            [ab.dx, ac.dx, -ray.direction.dx],
+            [ab.dy, ac.dy, -ray.direction.dy],
+            [ab.dz, ac.dz, -ray.direction.dz],
+        ], [ao.dx, ao.dy, ao.dz])
+        .map(|[r, s, t]| if r < 0. || s < 0. || r + s > 1. { None } else { Some(t) })
+        .flatten()
+    }
+}
