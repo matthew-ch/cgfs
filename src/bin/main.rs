@@ -17,7 +17,7 @@ fn save_canvas_to(canvas: &Canvas, p: &str) {
     writer.write_image_data(canvas.data()).unwrap();
 }
 
-fn main() {
+fn ray_tracing() {
     let mut canvas = Canvas::new(600, 600, Color::black());
     let mut scene = Scene::new(1., 1., Color { r: 225., g: 230., b: 252. });
     
@@ -276,4 +276,30 @@ fn main() {
     let t2 = std::time::SystemTime::now();
     println!("multi thread render time: {:?}", t2.duration_since(t1));
     save_canvas_to(&canvas, r"./output.png");
+}
+
+fn rasterization() {
+    let mut canvas = Canvas::new(600, 600, Color::white() * 0.9);
+    
+    let t1 = std::time::SystemTime::now();
+
+    let p0 = Point { x: -200., y: -250., z: 0. };
+    let p1 = Point { x: 200., y: 50., z: 0. };
+    let p2 = Point { x: 20., y: 250., z: 0. };
+
+    canvas.draw_filled_triangle(p0, p1, p2, Color::green());
+    canvas.draw_wireframe_triangle(p0, p1, p2, Color::blue());
+
+    let t2 = std::time::SystemTime::now();
+    println!("single thread render time: {:?}", t2.duration_since(t1));
+    save_canvas_to(&canvas, r"./output.png");
+}
+
+fn main() {
+    let mode = 2;
+    if mode == 1 {
+        ray_tracing();
+    } else {
+        rasterization();
+    }
 }

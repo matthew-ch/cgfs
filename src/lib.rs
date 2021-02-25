@@ -9,6 +9,15 @@ use std::ops::RangeInclusive;
 pub(crate) const EPS: f64 = 0.001;
 pub(crate) const AIR_REFRACTION_INDEX: f64 = 1.0;
 
+fn interpolate(i0: i32, d0: f64, i1: i32, d1: f64) -> Vec<f64> {
+    if i0 == i1 {
+        vec![d0]
+    } else {
+        let a = (d1 - d0) / (i1 - i0) as f64;
+        (i0..=i1).into_iter().map(|i| (i - i0) as f64 * a + d0).collect()
+    }
+}
+
 pub struct Canvas {
     width: u16,
     height: u16,
@@ -98,6 +107,79 @@ impl Canvas {
             }
         }
         self.set_pixel(x, y, color * (1. / (n * n) as f64));
+    }
+
+    pub fn draw_line(&mut self, mut p0: Point, mut p1: Point, color: Color) {
+        let x_ys: Box<dyn Iterator<Item = (i32, i32)>> = if (p0.x - p1.x).abs() > (p0.y - p1.y).abs() {
+            if p0.x > p1.x {
+                mem::swap(&mut p0, &mut p1);
+            }
+            let x0 = p0.x.round() as i32;
+            let x1 = p1.x.round() as i32;
+            Box::new(
+                (x0..=x1).into_iter()
+                    .zip(interpolate(x0, p0.y, x1, p1.y).into_iter().map(|y| y as i32))
+            )
+        } else {
+            if p0.y > p1.y {
+                mem::swap(&mut p0, &mut p1);
+            }
+            let y0 = p0.y.round() as i32;
+            let y1 = p1.y.round() as i32;
+            Box::new(
+                interpolate(y0, p0.x, y1, p1.x).into_iter().map(|x| x as i32)
+                    .zip((y0..=y1).into_iter())
+            )
+        };
+        for (x, y) in x_ys {
+            self.set_pixel((x + self.width as i32 / 2) as u16, (self.height as i32 / 2 -  y) as u16, color);
+        }
+    }
+
+    pub fn draw_wireframe_triangle(&mut self, p0: Point, p1: Point, p2: Point, color: Color) {
+        self.draw_line(p0, p1, color);
+        self.draw_line(p1, p2, color);
+        self.draw_line(p2, p0, color);
+    }
+
+    pub fn draw_filled_triangle(&mut self, mut p0: Point, mut p1: Point, mut p2: Point, color: Color) {
+        if p1.y < p0.y {
+            mem::swap(&mut p1, &mut p0);
+        }
+        if p2.y < p0.y {
+            mem::swap(&mut p2, &mut p0);
+        }
+        if p2.y < p1.y {
+            mem::swap(&mut p2, &mut p1);
+        }
+        let y0 = p0.y.round() as i32;
+        let y1 = p1.y.round() as i32;
+        let y2 = p2.y.round() as i32;
+        let x02 = interpolate(y0, p0.x, y2, p2.x);
+        let x012 = {
+            let mut x01 = interpolate(y0, p0.x, y1, p1.x);
+            let mut x12 = interpolate(y1, p1.x, y2, p2.x);
+            x01.pop();
+            x01.append(&mut x12);
+            x01
+        };
+        assert!(x02.len() == x012.len());
+        let (x_left, x_right) = {
+            let m = x02.len() / 2;
+            if x02[m] < x012[m] {
+                (&x02, &x012)
+            } else {
+                (&x012, &x02)
+            }
+        };
+        for y in y0..=y2 {
+            let i = (y - y0) as usize;
+            let l = x_left[i].round() as i32;
+            let r = x_right[i].round() as i32;
+            for x in l..=r {
+                self.set_pixel((x + self.width as i32 / 2) as u16, (self.height as i32 / 2 - y) as u16, color);
+            }
+        }
     }
 }
 
