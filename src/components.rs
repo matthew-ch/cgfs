@@ -47,6 +47,30 @@ impl Color {
         }
     }
 
+    pub const fn yellow() -> Self {
+        Color {
+            r: 255.,
+            g: 255.,
+            b: 0.,
+        }
+    }
+
+    pub const fn purple() -> Self {
+        Color {
+            r: 255.,
+            g: 0.,
+            b: 255.,
+        }
+    }
+
+    pub const fn cyan() -> Self {
+        Color {
+            r: 0.,
+            g: 255.,
+            b: 255.,
+        }
+    }
+
     pub fn clamp(&self) -> ColorPack {
         (
             clamp_color_component_f(self.r),
@@ -99,6 +123,16 @@ impl Point {
             x: 0.,
             y: 0.,
             z: 0.,
+        }
+    }
+}
+
+impl From<[f64; 3]> for Point {
+    fn from(p: [f64; 3]) -> Self {
+        Point {
+            x: p[0],
+            y: p[1],
+            z: p[2],
         }
     }
 }

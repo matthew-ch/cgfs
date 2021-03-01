@@ -229,3 +229,15 @@ impl LightObject for DirectionalLight {
         }
     }
 }
+
+
+pub struct SceneModel {
+    pub name: String,
+    pub vertices: Vec<[f64; 3]>,
+    pub triangles: Vec<([usize; 3], Color)>,
+}
+
+pub struct SceneModelInstance {
+    pub model_name: String,
+    pub position: Vector,
+}

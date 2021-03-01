@@ -9,7 +9,7 @@ fn save_canvas_to(canvas: &Canvas, p: &str) {
     let file = File::create(path).unwrap();
     let ref mut w = BufWriter::new(file);
 
-    let mut encoder = png::Encoder::new(w, canvas.get_width() as u32, canvas.get_height() as u32);
+    let mut encoder = png::Encoder::new(w, canvas.get_width(), canvas.get_height());
     encoder.set_color(png::ColorType::RGB);
     encoder.set_depth(png::BitDepth::Eight);
     let mut writer = encoder.write_header().unwrap();
@@ -280,15 +280,49 @@ fn ray_tracing() {
 
 fn rasterization() {
     let mut canvas = Canvas::new(600, 600, Color::white() * 0.9);
-    
+    let mut scene = Scene::new(1., 1., Color::black());
+
+    scene.add_model(SceneModel {
+        name: "cube".into(),
+        vertices: vec![
+            [1., 1., 1.],
+            [-1., 1., 1.],
+            [-1., -1., 1.],
+            [1., -1., 1.],
+            [1., 1., -1.],
+            [-1., 1., -1.],
+            [-1., -1., -1.],
+            [1., -1., -1. ],
+        ],
+        triangles: vec![
+            ([0, 1, 2], Color::red()),
+            ([0, 2, 3], Color::red()),
+            ([4, 0, 3], Color::green()),
+            ([4, 3, 7], Color::green()),
+            ([5, 4, 7], Color::blue()),
+            ([5, 7, 6], Color::blue()),
+            ([1, 5, 6], Color::yellow()),
+            ([1, 6, 2], Color::yellow()),
+            ([4, 5, 1], Color::purple()),
+            ([4, 1, 0], Color::purple()),
+            ([2, 6, 7], Color::cyan()),
+            ([2, 7, 3], Color::cyan()),
+        ],
+    });
+
+    scene.add_instance(SceneModelInstance {
+        model_name: "cube".into(),
+        position: Vector { dx: -1.5, dy: 0., dz: 7.},
+    });
+
+    scene.add_instance(SceneModelInstance {
+        model_name: "cube".into(),
+        position: Vector { dx: 1.25, dy: 2., dz: 7.5},
+    });
+
     let t1 = std::time::SystemTime::now();
 
-    let p0 = Point { x: -200., y: -250., z: 0. };
-    let p1 = Point { x: 200., y: 50., z: 0. };
-    let p2 = Point { x: 20., y: 250., z: 0. };
-
-    canvas.draw_filled_triangle(p0, p1, p2, Color::green());
-    canvas.draw_wireframe_triangle(p0, p1, p2, Color::blue());
+    canvas.rasterize(&scene);
 
     let t2 = std::time::SystemTime::now();
     println!("single thread render time: {:?}", t2.duration_since(t1));
