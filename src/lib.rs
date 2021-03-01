@@ -125,24 +125,24 @@ impl Canvas {
     }
 
     pub fn draw_line(&mut self, mut p0: Point, mut p1: Point, color: Color) {
-        let x_ys: Box<dyn Iterator<Item = (i32, i32)>> = if (p0.x - p1.x).abs() > (p0.y - p1.y).abs() {
-            if p0.x > p1.x {
+        let x_ys: Box<dyn Iterator<Item = (i32, i32)>> = if (p0.x() - p1.x()).abs() > (p0.y() - p1.y()).abs() {
+            if p0.x() > p1.x() {
                 mem::swap(&mut p0, &mut p1);
             }
-            let x0 = p0.x.round() as i32;
-            let x1 = p1.x.round() as i32;
+            let x0 = p0.x().round() as i32;
+            let x1 = p1.x().round() as i32;
             Box::new(
                 (x0..=x1).into_iter()
-                    .zip(interpolate(x0, p0.y, x1, p1.y).into_iter().map(|y| y as i32))
+                    .zip(interpolate(x0, p0.y(), x1, p1.y()).into_iter().map(|y| y as i32))
             )
         } else {
-            if p0.y > p1.y {
+            if p0.y() > p1.y() {
                 mem::swap(&mut p0, &mut p1);
             }
-            let y0 = p0.y.round() as i32;
-            let y1 = p1.y.round() as i32;
+            let y0 = p0.y().round() as i32;
+            let y1 = p1.y().round() as i32;
             Box::new(
-                interpolate(y0, p0.x, y1, p1.x).into_iter().map(|x| x as i32)
+                interpolate(y0, p0.x(), y1, p1.x()).into_iter().map(|x| x as i32)
                     .zip((y0..=y1).into_iter())
             )
         };
@@ -158,30 +158,30 @@ impl Canvas {
     }
 
     pub fn draw_shaded_triangle(&mut self, mut p0: Point, mut p1: Point, mut p2: Point, color: Color) {
-        if p1.y < p0.y {
+        if p1.y() < p0.y() {
             mem::swap(&mut p1, &mut p0);
         }
-        if p2.y < p0.y {
+        if p2.y() < p0.y() {
             mem::swap(&mut p2, &mut p0);
         }
-        if p2.y < p1.y {
+        if p2.y() < p1.y() {
             mem::swap(&mut p2, &mut p1);
         }
-        let y0 = p0.y.round() as i32;
-        let y1 = p1.y.round() as i32;
-        let y2 = p2.y.round() as i32;
-        let x02 = interpolate(y0, p0.x, y2, p2.x);
-        let h02 = interpolate(y0, p0.z, y2, p2.z);
+        let y0 = p0.y().round() as i32;
+        let y1 = p1.y().round() as i32;
+        let y2 = p2.y().round() as i32;
+        let x02 = interpolate(y0, p0.x(), y2, p2.x());
+        let h02 = interpolate(y0, p0.z(), y2, p2.z());
         let x012 = {
-            let mut x01 = interpolate(y0, p0.x, y1, p1.x);
-            let mut x12 = interpolate(y1, p1.x, y2, p2.x);
+            let mut x01 = interpolate(y0, p0.x(), y1, p1.x());
+            let mut x12 = interpolate(y1, p1.x(), y2, p2.x());
             x01.pop();
             x01.append(&mut x12);
             x01
         };
         let h012 = {
-            let mut h01 = interpolate(y0, p0.z, y1, p1.z);
-            let mut h12 = interpolate(y1, p1.z, y2, p2.z);
+            let mut h01 = interpolate(y0, p0.z(), y1, p1.z());
+            let mut h12 = interpolate(y1, p1.z(), y2, p2.z());
             h01.pop();
             h01.append(&mut h12);
             h01
@@ -258,7 +258,7 @@ impl Scene {
             background,
             objects: Vec::new(),
             lights: Vec::new(),
-            camera_position: Point::zero(),
+            camera_position: (0., 0., 0.).into(),
             camera_rotation: Matrix::identity(),
             camera_distance: 1.,
             models: Vec::new(),
@@ -291,21 +291,22 @@ impl Scene {
     pub fn canvas_to_viewport(&self, x: i32, y: i32, width: u32, height: u32) -> Ray {
         Ray {
             origin: self.camera_position,
-            direction: self.camera_rotation.dot(&Vector {
-                dx: x as f64 / width as f64 * self.viewport_width,
-                dy: y as f64 / height as f64 * self.viewport_height,
-                dz: self.camera_distance,
-            })
+            direction: self.camera_rotation.dot(&(
+                x as f64 / width as f64 * self.viewport_width,
+                y as f64 / height as f64 * self.viewport_height,
+                self.camera_distance,
+                0.,
+            ).into())
         }
     }
 
     pub fn viewport_to_canvas(&self, point: Point, width: u32, height: u32) -> Point {
-        let factor = self.camera_distance / point.z;
-        Point {
-            x: point.x * width as f64 / self.viewport_width * factor,
-            y: point.y * height as f64 / self.viewport_height * factor,
-            z: factor,
-        }
+        let factor = self.camera_distance / point.z();
+        (
+            point.x() * width as f64 / self.viewport_width * factor,
+            point.y() * height as f64 / self.viewport_height * factor,
+            factor,
+        ).into()
     }
 
     fn compute_lighting(&self, point: &Point, normal: &Vector, view: &Vector, specular: i32) -> f64 {

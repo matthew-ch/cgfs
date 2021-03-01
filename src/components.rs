@@ -1,4 +1,4 @@
-use std::ops::{Add, Div, Index, Mul, Neg, Sub};
+use std::ops::{Add, Div, Mul, Neg, Sub};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Color {
@@ -111,70 +111,37 @@ impl Mul<f64> for Color {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct Point {
-    pub x: f64,
-    pub y: f64,
-    pub z: f64,
-}
+pub struct HomogeneousCoordinate(f64, f64, f64, f64);
 
-impl Point {
-    pub const fn zero() -> Self {
-        Point {
-            x: 0.,
-            y: 0.,
-            z: 0.,
-        }
+impl HomogeneousCoordinate {
+
+    pub fn x(&self) -> f64 {
+        self.0
     }
-}
 
-impl From<[f64; 3]> for Point {
-    fn from(p: [f64; 3]) -> Self {
-        Point {
-            x: p[0],
-            y: p[1],
-            z: p[2],
-        }
+    pub fn y(&self) -> f64 {
+        self.1
     }
-}
 
-impl Sub for Point {
-    type Output = Vector;
-
-    fn sub(self, rhs: Point) -> Vector {
-        Vector {
-            dx: self.x - rhs.x,
-            dy: self.y - rhs.y,
-            dz: self.z - rhs.z,
-        }
+    pub fn z(&self) -> f64 {
+        self.2
     }
-}
 
-impl Add<Vector> for Point {
-    type Output = Point;
-
-    fn add(self, rhs: Vector) -> Point {
-        Point {
-            x: self.x + rhs.dx,
-            y: self.y + rhs.dy,
-            z: self.z + rhs.dz,
-        }
+    pub fn w(&self) -> f64 {
+        self.3
     }
-}
 
-#[derive(Debug, Clone, Copy)]
-pub struct Vector {
-    pub dx: f64,
-    pub dy: f64,
-    pub dz: f64,
-}
-
-impl Vector {
     pub fn dot(&self, rhs: &Self) -> f64 {
-        self.dx * rhs.dx + self.dy * rhs.dy + self.dz * rhs.dz
+        self.0 * rhs.0 + self.1 * rhs.1 + self.2 * rhs.2 + self.3 * rhs.3
     }
 
-    pub fn length(&self) -> f64 {
-        self.dot(self).sqrt()
+    pub fn cross(&self, rhs: &Self) -> Self {
+        Self(
+            self.1 * rhs.2 - self.2 * rhs.1,
+            self.2 * rhs.0 - self.0 * rhs.2,
+            self.0 * rhs.1 - self.1 * rhs.0,
+            0.,
+        )
     }
 
     pub fn cos(&self, rhs: &Self) -> f64 {
@@ -185,152 +152,211 @@ impl Vector {
     pub fn reflect(&self, rhs: &Self) -> Self {
         *self * self.dot(rhs) * 2. - *rhs
     }
-}
 
-impl Add<Vector> for Vector {
-    type Output = Vector;
+    pub fn length(&self) -> f64 {
+        self.dot(self).sqrt()
+    }
 
-    fn add(self, rhs: Vector) -> Vector {
-        Vector {
-            dx: self.dx + rhs.dx,
-            dy: self.dy + rhs.dy,
-            dz: self.dz + rhs.dz,
+    pub fn canonical(&self) -> Self {
+        if self.3 == 0. || self.3 == 1. {
+            *self
+        } else {
+            Self(self.0 / self.3, self.1 / self.3, self.2 / self.3, 1.)
         }
     }
+
 }
 
-impl Sub<Vector> for Vector {
-    type Output = Vector;
+impl Add for HomogeneousCoordinate {
+    type Output = Self;
 
-    fn sub(self, rhs: Vector) -> Vector {
-        Vector {
-            dx: self.dx - rhs.dx,
-            dy: self.dy - rhs.dy,
-            dz: self.dz - rhs.dz,
+    fn add(self, rhs: Self) -> Self {
+        Self(
+            self.0 + rhs.0,
+            self.1 + rhs.1,
+            self.2 + rhs.2,
+            self.3 + rhs.3,
+        )
+    }
+}
+
+impl Sub for HomogeneousCoordinate {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self {
+        Self(
+            self.0 - rhs.0,
+            self.1 - rhs.1,
+            self.2 - rhs.2,
+            self.3 - rhs.3,
+        )
+    }
+}
+
+impl Mul<f64> for HomogeneousCoordinate {
+    type Output = Self;
+
+    fn mul(self, rhs: f64) -> Self {
+        Self(
+            self.0 * rhs,
+            self.1 * rhs,
+            self.2 * rhs,
+            self.3 * rhs,
+        )
+    }
+}
+
+impl Div<f64> for HomogeneousCoordinate {
+    type Output = Self;
+
+    fn div(self, rhs: f64) -> Self {
+        self * (1. / rhs)
+    }
+}
+
+impl Neg for HomogeneousCoordinate {
+    type Output = Self;
+
+    fn neg(self) -> Self {
+        Self(-self.0, -self.1, -self.2, -self.3)
+    }
+}
+
+impl From<[f64; 4]> for HomogeneousCoordinate {
+    fn from(value: [f64; 4]) -> Self {
+        Self(value[0], value[1], value[2], value[3])
+    }
+}
+
+impl From<[f64; 3]> for HomogeneousCoordinate {
+    fn from(value: [f64; 3]) -> Self {
+        Self(value[0], value[1], value[2], 1.)
+    }
+}
+
+impl From<(f64, f64, f64, f64)> for HomogeneousCoordinate {
+    fn from(value: (f64, f64, f64, f64)) -> Self {
+        Self(value.0, value.1, value.2, value.3)
+    }
+}
+
+impl From<(f64, f64, f64)> for HomogeneousCoordinate {
+    fn from(value: (f64, f64, f64)) -> Self {
+        Self(value.0, value.1, value.2, 1.)
+    }
+}
+
+pub type Point = HomogeneousCoordinate;
+pub type Vector = HomogeneousCoordinate;
+
+pub struct HomogeneousMatrix([[f64; 4];4]);
+
+impl HomogeneousMatrix {
+    pub fn identity() -> Self {
+        Self([
+            [1., 0., 0., 0.],
+            [0., 1., 0., 0.],
+            [0., 0., 1., 0.],
+            [0., 0., 0., 1.],
+        ])
+    }
+
+    pub fn scale(s: f64) -> Self {
+        Self([
+            [s, 0., 0., 0.],
+            [0., s, 0., 0.],
+            [0., 0., s, 0.],
+            [0., 0., 0., 1.],
+        ])
+    }
+
+    pub fn translation(tx: f64, ty: f64, tz: f64) -> Self {
+        Self([
+            [1., 0., 0., tx],
+            [0., 1., 0., ty],
+            [0., 0., 1., tz],
+            [0., 0., 0., 1.],
+        ])
+    }
+
+    pub fn rotation_x(deg: f64) -> Self {
+        let (sin, cos) = deg.to_radians().sin_cos();
+        Self([
+            [1., 0., 0., 0.],
+            [0., cos, -sin, 0.],
+            [0., sin, cos, 0.],
+            [0., 0., 0., 1.],
+        ])
+    }
+
+    pub fn rotation_y(deg: f64) -> Self {
+        let (sin, cos) = deg.to_radians().sin_cos();
+        Self([
+            [cos, 0., sin, 0.],
+            [0., 1., 0., 0.],
+            [-sin, 0., cos, 0.],
+            [0., 0., 0., 1.],
+        ])
+    }
+
+    pub fn rotation_z(deg: f64) -> Self {
+        let (sin, cos) = deg.to_radians().sin_cos();
+        Self([
+            [cos, -sin, 0., 0.],
+            [sin, cos, 0., 0.],
+            [0., 0., 1., 0.],
+            [0., 0., 0., 1.],
+        ])
+    }
+
+    pub fn compose(m: Vec<Self>) -> Self {
+        m.into_iter().fold(Self::identity(), |acc, x| acc * x)
+    }
+
+    pub fn dot(&self, rhs: &HomogeneousCoordinate) -> HomogeneousCoordinate {
+        HomogeneousCoordinate(
+            HomogeneousCoordinate::from(self.0[0]).dot(rhs),
+            HomogeneousCoordinate::from(self.0[1]).dot(rhs),
+            HomogeneousCoordinate::from(self.0[2]).dot(rhs),
+            HomogeneousCoordinate::from(self.0[3]).dot(rhs),
+        )
+    }
+
+    pub fn transposed(&self) -> Self {
+        let mat = &self.0;
+        Self([
+            [mat[0][0], mat[1][0], mat[2][0], mat[3][0]],
+            [mat[0][1], mat[1][1], mat[2][1], mat[3][1]],
+            [mat[0][2], mat[1][2], mat[2][2], mat[3][2]],
+            [mat[0][3], mat[1][3], mat[2][3], mat[3][3]],
+        ])
+    }
+}
+
+impl Mul for HomogeneousMatrix {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self {
+        let l_mat = &self.0;
+        let r_mat = &rhs.0;
+        let mut mat = [[0.; 4]; 4];
+        for i in 0..4 {
+            for j in 0..4 {
+                for k in 0..4 {
+                    mat[i][j] += l_mat[i][k] * r_mat[k][j];
+                }
+            }
         }
+        Self(mat)
     }
 }
 
-impl Mul<f64> for Vector {
-    type Output = Vector;
-
-    fn mul(self, rhs: f64) -> Vector {
-        Vector {
-            dx: self.dx * rhs,
-            dy: self.dy * rhs,
-            dz: self.dz * rhs,
-        }
-    }
-}
-
-impl Div<f64> for Vector {
-    type Output = Vector;
-
-    fn div(self, rhs: f64) -> Vector {
-        self.mul(1. / rhs)
-    }
-}
-
-impl Neg for Vector {
-    type Output = Vector;
-
-    fn neg(self) -> Vector {
-        Vector {
-            dx: -self.dx,
-            dy: -self.dy,
-            dz: -self.dz,
-        }
-    }
-}
+pub type Matrix = HomogeneousMatrix;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Ray {
     pub origin: Point,
     pub direction: Vector,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct Matrix([Vector; 3]);
-
-impl Index<usize> for Matrix {
-    type Output = Vector;
-
-    fn index(&self, index: usize) -> &Vector {
-        &self.0[index]
-    }
-}
-
-impl Matrix {
-    pub fn identity() -> Self {
-        Matrix([
-            Vector { dx: 1., dy: 0., dz: 0., },
-            Vector { dx: 0., dy: 1., dz: 0. },
-            Vector { dx: 0., dy: 0., dz: 1. },
-        ])
-    }
-
-    pub fn rotate_x(deg: f64) -> Self {
-        let (sin, cos) = deg.to_radians().sin_cos();
-
-        Matrix([
-            Vector { dx: 1., dy: 0., dz: 0. },
-            Vector { dx: 0., dy: cos, dz: sin },
-            Vector { dx: 0., dy: -sin, dz: cos },
-        ])
-    }
-
-    pub fn rotate_y(deg: f64) -> Self {
-        let (sin, cos) = deg.to_radians().sin_cos();
-
-        Matrix([
-            Vector { dx: cos, dy: 0., dz: -sin },
-            Vector { dx: 0., dy: 1., dz: 0. },
-            Vector { dx: sin, dy: 0., dz: cos },
-        ])
-    }
-
-    pub fn rotate_z(deg: f64) -> Self {
-        let (sin, cos) = deg.to_radians().sin_cos();
-
-        Matrix([
-            Vector { dx: cos, dy: sin, dz: 0. },
-            Vector { dx: -sin, dy: cos, dz: 0. },
-            Vector { dx: 0., dy: 0., dz: 1. }
-        ])
-    }
-
-    pub fn compose(m: &Vec<Matrix>) -> Matrix {
-        m.iter().fold(Self::identity(), |acc, &x| acc * x)
-    }
-
-    pub fn transpose(&self) -> Matrix {
-        Matrix([
-            Vector { dx: self[0].dx, dy: self[1].dx, dz: self[2].dx },
-            Vector { dx: self[0].dy, dy: self[1].dy, dz: self[2].dy },
-            Vector { dx: self[0].dz, dy: self[1].dz, dz: self[2].dz },
-        ])
-    }
-
-    pub fn dot(&self, rhs: &Vector) -> Vector {
-        Vector {
-            dx: self[0].dot(rhs),
-            dy: self[1].dot(rhs),
-            dz: self[2].dot(rhs),
-        }
-    }
-}
-
-impl Mul<Matrix> for Matrix {
-    type Output = Matrix;
-
-    fn mul(self, rhs: Matrix) -> Matrix {
-        let t = rhs.transpose();
-        Matrix([
-            Vector { dx: self[0].dot(&t[0]), dy: self[0].dot(&t[1]), dz: self[0].dot(&t[2]) },
-            Vector { dx: self[1].dot(&t[0]), dy: self[1].dot(&t[1]), dz: self[1].dot(&t[2]) },
-            Vector { dx: self[2].dot(&t[0]), dy: self[2].dot(&t[1]), dz: self[2].dot(&t[2]) },
-        ])
-    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -417,11 +443,7 @@ impl Triangle {
     pub fn new(a: Point, b: Point, c: Point) -> Triangle {
         let v: Vector = c - a;
         let w: Vector = b - a;
-        let cross = Vector {
-            dx: v.dy * w.dz - v.dz * w.dy,
-            dy: v.dz * w.dx - v.dx * w.dz,
-            dz: v.dx * w.dy - v.dy * w.dx,
-        };
+        let cross = v.cross(&w);
         Triangle {
             a,
             b,
@@ -435,10 +457,10 @@ impl Triangle {
         let ac: Vector = self.c - self.a;
         let ao: Vector = ray.origin - self.a;
         solve_equations([
-            [ab.dx, ac.dx, -ray.direction.dx],
-            [ab.dy, ac.dy, -ray.direction.dy],
-            [ab.dz, ac.dz, -ray.direction.dz],
-        ], [ao.dx, ao.dy, ao.dz])
+            [ab.x(), ac.x(), -ray.direction.x()],
+            [ab.y(), ac.y(), -ray.direction.y()],
+            [ab.z(), ac.z(), -ray.direction.z()],
+        ], [ao.x(), ao.y(), ao.z()])
         .map(|[r, s, t]| if r < 0. || s < 0. || r + s > 1. { None } else { Some(t) })
         .flatten()
     }

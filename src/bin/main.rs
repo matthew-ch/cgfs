@@ -23,11 +23,7 @@ fn ray_tracing() {
     
     let red_sphere = SphereObject {
         sphere: Sphere {
-            center: Point {
-                x: 0.,
-                y: -1.5,
-                z: 3.,
-            },
+            center: (0., -1.5, 3.).into(),
             radius: 1.,
         },
         material: Material{
@@ -40,11 +36,7 @@ fn ray_tracing() {
 
     let blue_sphere = SphereObject {
         sphere: Sphere {
-            center: Point {
-                x: 2.,
-                y: 1.,
-                z: 4.,
-            },
+            center: (2., 1., 4.).into(),
             radius: 1.,
         },
         material: Material {
@@ -57,11 +49,7 @@ fn ray_tracing() {
 
     let green_sphere = SphereObject {
         sphere: Sphere {
-            center: Point {
-                x: -2.,
-                y: 0.,
-                z: 4.,
-            },
+            center: (-2., 0., 4.).into(),
             radius: 1.,
         },
         material: Material {
@@ -74,11 +62,7 @@ fn ray_tracing() {
 
     let yellow_sphere = SphereObject {
         sphere: Sphere {
-            center: Point {
-                x: 0.,
-                y: -5001.,
-                z: 0.,
-            },
+            center: (0., -5001., 0.).into(),
             radius: 5000.,
         },
         material: Material {
@@ -100,20 +84,12 @@ fn ray_tracing() {
 
     let subtraction = BooleanOperationSpheresObject {
         sphere_a: Sphere {
-            center: Point {
-                x: 0.,
-                y: 3.,
-                z: 5.,
-            },
+            center: (0., 3., 5.).into(),
             radius: 1.5,
         },
         operation: BooleanOperation::SUBTRACTION,
         sphere_b: Sphere {
-            center: Point {
-                x: 0.,
-                y: 4.,
-                z: 3.,
-            },
+            center: (0., 4., 3.).into(),
             radius: 1.5,
         },
         material: Material {
@@ -132,20 +108,12 @@ fn ray_tracing() {
 
     let intersection = BooleanOperationSpheresObject {
         sphere_a: Sphere {
-            center: Point {
-                x: -1.0,
-                y: 2.0,
-                z: 2.0,
-            },
+            center: (-1., 2., 2.).into(),
             radius: 0.6,
         },
         operation: BooleanOperation::INTERSECTION,
         sphere_b: Sphere {
-            center: Point {
-                x: -1.4,
-                y: 1.8,
-                z: 1.9,
-            },
+            center: (-1.4, 1.8, 1.9).into(),
             radius: 0.5,
         },
         material: Material {
@@ -164,20 +132,12 @@ fn ray_tracing() {
 
     let union = BooleanOperationSpheresObject {
         sphere_a: Sphere {
-            center: Point {
-                x: 0.4,
-                y: 1.0,
-                z: 2.5,
-            },
+            center: (0.4, 1., 2.5).into(),
             radius: 0.6,
         },
         operation: BooleanOperation::UNION,
         sphere_b: Sphere {
-            center: Point {
-                x: 0.3,
-                y: 0.8,
-                z: 2.3,
-            },
+            center: (0.3, 0.8, 2.3).into(),
             radius: 0.5,
         },
         material: Material {
@@ -197,36 +157,28 @@ fn ray_tracing() {
     scene.add_light(Box::new(AmbientLight { intensity: 0.2 }));
     scene.add_light(Box::new(PointLight {
         intensity: 0.6,
-        position: Point {
-            x: 2.,
-            y: 1.,
-            z: 0.,
-        },
+        position: (2., 1., 0.).into(),
     }));
     scene.add_light(Box::new(DirectionalLight {
         intensity: 0.2,
-        direction: Vector {
-            dx: 1.,
-            dy: 4.,
-            dz: 4.,
-        },
+        direction: (1., 4., 4., 0.).into(),
     }));
 
     scene.set_camera(
-        Point { x: 1.5, y: 1.0, z: -6.0 },
-        Matrix::compose(&vec![
-            Matrix::rotate_x(5.),
-            Matrix::rotate_y(5.),
-            Matrix::rotate_z(10.),
+        (1.5, 1.0, -6.0).into(),
+        Matrix::compose(vec![
+            Matrix::rotation_x(-5.),
+            Matrix::rotation_y(-5.),
+            Matrix::rotation_z(-10.),
         ]),
         1.5,
     );
 
     let vertices = [
-        Point { x: 0., y: 2., z: 0.},
-        Point { x: 3., y: 5., z: 5.},
-        Point { x: 0., y: 3.5, z: -1.},
-        Point { x: -3., y: 5., z: 5.},
+        (0., 2., 0.).into(),
+        (3., 5., 5.).into(),
+        (0., 3.5, -1.).into(),
+        (-3., 5., 5.).into(),
     ];
 
     let polyhedron = PolyhedronObject {
@@ -248,12 +200,12 @@ fn ray_tracing() {
 
     let lense = BooleanOperationSpheresObject {
         sphere_a: Sphere {
-            center: Point { x: 0.5, y: 1.0, z: -0.5 },
+            center: (0.5, 1.0, -0.5).into(),
             radius: 1.,
         },
         operation: BooleanOperation::INTERSECTION,
         sphere_b: Sphere {
-            center: Point { x: 0.5, y: 1.5, z: -1.5 },
+            center: (0.5, 1.5, -1.5).into(),
             radius: 1.,
         },
         material: Material {
@@ -312,12 +264,12 @@ fn rasterization() {
 
     scene.add_instance(SceneModelInstance {
         model_name: "cube".into(),
-        position: Vector { dx: -1.5, dy: 0., dz: 7.},
+        position: (-1.5, 0., 7., 0.).into(),
     });
 
     scene.add_instance(SceneModelInstance {
         model_name: "cube".into(),
-        position: Vector { dx: 1.25, dy: 2., dz: 7.5},
+        position: (1.25, 2., 7.5, 0.).into(),
     });
 
     let t1 = std::time::SystemTime::now();
