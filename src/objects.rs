@@ -239,5 +239,5 @@ pub struct SceneModel {
 
 pub struct SceneModelInstance {
     pub model_name: String,
-    pub position: Vector,
+    pub transform: Matrix,
 }

@@ -216,6 +216,9 @@ impl Canvas {
     }
 
     pub fn rasterize(&mut self, scene: &Scene) {
+        let projection = scene.get_projection_matrix(self.width, self.height);
+        let camera = scene.get_camera_matrix();
+        let m: Matrix = projection * camera;
         for instance in scene.instances.iter() {
             let model = scene.models.iter().find(|&model| model.name == instance.model_name);
             if model.is_none() {
@@ -223,8 +226,8 @@ impl Canvas {
             }
             let model = model.unwrap();
             let projected: Vec<Point> = model.vertices.iter()
-                .map(|&v| Point::from(v) + instance.position)
-                .map(|v| scene.viewport_to_canvas(v, self.width, self.height))
+                .map(|&v| instance.transform.dot(&v.into()))
+                .map(|v| m.dot(&v).canonical())
                 .collect();
             for t in model.triangles.iter() {
                 self.render_triangle(t, &projected);
@@ -300,13 +303,34 @@ impl Scene {
         }
     }
 
-    pub fn viewport_to_canvas(&self, point: Point, width: u32, height: u32) -> Point {
-        let factor = self.camera_distance / point.z();
-        (
-            point.x() * width as f64 / self.viewport_width * factor,
-            point.y() * height as f64 / self.viewport_height * factor,
-            factor,
-        ).into()
+    pub fn get_camera_matrix(&self) -> Matrix {
+        let pos = self.camera_position;
+        Matrix::compose(vec![
+            self.camera_rotation.transposed(),
+            Matrix::translation(-pos.x(), -pos.y(), -pos.z()),
+        ])
+    }
+
+    pub fn get_projection_matrix(&self, canvas_width: u32, canvas_height: u32) -> Matrix {
+        Matrix::compose(vec![
+            {
+                let d = self.camera_distance;
+                let mut mat = [[0.; 4]; 4];
+                mat[0][0] = d;
+                mat[1][1] = d;
+                mat[2][2] = 1.;
+                mat[3][2] = 1.;
+                Matrix::new(mat)
+            },
+            {
+                let mut mat = [[0.; 4]; 4];
+                mat[0][0] = canvas_width as f64 / self.viewport_width;
+                mat[1][1] = canvas_height as f64 / self.viewport_height;
+                mat[2][2] = 1.;
+                mat[3][3] = 1.;
+                Matrix::new(mat)
+            }
+        ])
     }
 
     fn compute_lighting(&self, point: &Point, normal: &Vector, view: &Vector, specular: i32) -> f64 {

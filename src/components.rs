@@ -249,9 +249,14 @@ impl From<(f64, f64, f64)> for HomogeneousCoordinate {
 pub type Point = HomogeneousCoordinate;
 pub type Vector = HomogeneousCoordinate;
 
+#[derive(Debug, Clone, Copy)]
 pub struct HomogeneousMatrix([[f64; 4];4]);
 
 impl HomogeneousMatrix {
+    pub fn new(mat: [[f64; 4]; 4]) -> Self {
+        Self(mat)
+    }
+
     pub fn identity() -> Self {
         Self([
             [1., 0., 0., 0.],

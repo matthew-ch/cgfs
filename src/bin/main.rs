@@ -264,13 +264,25 @@ fn rasterization() {
 
     scene.add_instance(SceneModelInstance {
         model_name: "cube".into(),
-        position: (-1.5, 0., 7., 0.).into(),
+        transform: Matrix::compose(vec![
+            Matrix::translation(-1.5, 0., 7.),
+            Matrix::scale(0.75),
+        ]),
     });
 
     scene.add_instance(SceneModelInstance {
         model_name: "cube".into(),
-        position: (1.25, 2., 7.5, 0.).into(),
+        transform: Matrix::compose(vec![
+            Matrix::translation(1.25, 2.5, 7.5),
+            Matrix::rotation_y(-195.),
+        ]),
     });
+
+    scene.set_camera(
+        (-3., 1., 2.).into(), 
+        Matrix::rotation_y(30.),
+        1.into(),
+    );
 
     let t1 = std::time::SystemTime::now();
 
