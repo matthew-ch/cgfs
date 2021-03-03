@@ -131,6 +131,22 @@ impl HomogeneousCoordinate {
         self.3
     }
 
+    pub fn set_x(&mut self, x: f64) {
+        self.0 = x;
+    }
+
+    pub fn set_y(&mut self, y: f64) {
+        self.1 = y;
+    }
+
+    pub fn set_z(&mut self, z: f64) {
+        self.2 = z;
+    }
+
+    pub fn set_w(&mut self, w: f64) {
+        self.3 = w;
+    }
+
     pub fn dot(&self, rhs: &Self) -> f64 {
         self.0 * rhs.0 + self.1 * rhs.1 + self.2 * rhs.2 + self.3 * rhs.3
     }
@@ -471,6 +487,7 @@ impl Triangle {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct Plane {
     pub normal: Vector,
     pub d: f64,

@@ -22,18 +22,20 @@ pub struct Canvas {
     width: u32,
     height: u32,
     image_data: Vec<ColorPack>,
+    depth_buffer: Vec<f64>,
 }
 
 impl Canvas {
     pub fn new(width: u32, height: u32, background: Color) -> Canvas {
         assert!(width > 0 && height > 0);
 
-        let image_data = vec![background.clamp(); width as usize * height as usize];
+        let image_data = vec![background.clamp(); (width * height) as usize];
 
         Canvas {
             width,
             height,
             image_data,
+            depth_buffer: vec![0.; (width * height) as usize],
         }
     }
 
@@ -53,6 +55,21 @@ impl Canvas {
     pub fn set_pixel(&mut self, x: u32, y: u32, color: Color) {
         let index = self.index(x, y);
         self.image_data[index] = color.clamp();
+    }
+
+    fn update_depth_buffer(&mut self, x: i32, y: i32, iz: f64) -> bool {
+        let x = x + self.width as i32 / 2;
+        let y = self.height as i32 / 2 - y;
+        if x < 0 || x >= self.width as i32 || y < 0 || y >= self.height as i32 {
+            return false;
+        }
+        let index = self.index(x as u32, y as u32);
+        if self.depth_buffer[index] < iz {
+            self.depth_buffer[index] = iz;
+            true
+        } else {
+            false
+        }
     }
 
     pub fn put_pixel(&mut self, x: i32, y: i32, color: Color) {
@@ -171,7 +188,7 @@ impl Canvas {
         let y1 = p1.y().round() as i32;
         let y2 = p2.y().round() as i32;
         let x02 = interpolate(y0, p0.x(), y2, p2.x());
-        let h02 = interpolate(y0, p0.z(), y2, p2.z());
+        let iz02 = interpolate(y0, 1. / p0.z(), y2, 1. / p2.z());
         let x012 = {
             let mut x01 = interpolate(y0, p0.x(), y1, p1.x());
             let mut x12 = interpolate(y1, p1.x(), y2, p2.x());
@@ -179,40 +196,49 @@ impl Canvas {
             x01.append(&mut x12);
             x01
         };
-        let h012 = {
-            let mut h01 = interpolate(y0, p0.z(), y1, p1.z());
-            let mut h12 = interpolate(y1, p1.z(), y2, p2.z());
-            h01.pop();
-            h01.append(&mut h12);
-            h01
+        let iz012 = {
+            let mut iz01 = interpolate(y0, 1. / p0.z(), y1, 1. / p1.z());
+            let mut iz12 = interpolate(y1, 1. / p1.z(), y2, 1. / p2.z());
+            iz01.pop();
+            iz01.append(&mut iz12);
+            iz01
         };
         assert!(x02.len() == x012.len());
-        let (x_left, x_right, h_left, h_right) = {
+        let (x_left, x_right, iz_left, iz_right) = {
             let m = x02.len() / 2;
             if x02[m] < x012[m] {
-                (&x02, &x012, &h02, &h012)
+                (&x02, &x012, &iz02, &iz012)
             } else {
-                (&x012, &x02, &h012, &h02)
+                (&x012, &x02, &iz012, &iz02)
             }
         };
         for y in y0..=y2 {
             let i = (y - y0) as usize;
             let l = x_left[i].round() as i32;
             let r = x_right[i].round() as i32;
-            let hs = interpolate(l, h_left[i], r, h_right[i]);
+            let izs = interpolate(l, iz_left[i], r, iz_right[i]);
             for x in l..=r {
-                self.put_pixel(x, y, color * hs[(x - l) as usize]);
+                let iz = izs[(x - l) as usize];
+                if self.update_depth_buffer(x, y, iz) {
+                    self.put_pixel(x, y, color);
+                }
             }
         }
     }
 
-    fn render_triangle(&mut self, triangle: &([usize; 3], Color), projected: &Vec<Point>) {
-        self.draw_wireframe_triangle(
-            projected[triangle.0[0]], 
-            projected[triangle.0[1]], 
-            projected[triangle.0[2]],
-            triangle.1,
-        );
+    fn render_triangle(&mut self, triangle: &([usize; 3], Color), projected: &Vec<Point>, model_vertices: &Vec<Point>) {
+        let [i, j, k] = triangle.0;
+        let normal = Triangle::new(model_vertices[i], model_vertices[j], model_vertices[k]).normal;
+        let center = (model_vertices[i] + model_vertices[j] + model_vertices[k]) / 3.;
+        if normal.dot(&center) < 0. {
+            self.draw_shaded_triangle(
+                projected[i], 
+                projected[j], 
+                projected[k],
+                triangle.1,
+            );
+            // self.draw_wireframe_triangle(projected[i], projected[j], projected[k], triangle.1 * 0.7);
+        }
     }
 
     pub fn rasterize(&mut self, scene: &Scene) {
@@ -228,9 +254,15 @@ impl Canvas {
                 .collect();
             let model = SceneModel::new(model.name.clone(), vertices, model.triangles.clone());
             if let Some(model) = Self::clip_model(&clipping_planes, model) {
-                let vertices = model.vertices.iter().map(|v| projection.dot(v).canonical()).collect::<Vec<_>>();
+                let vertices = model.vertices.iter()
+                    .map(|v| {
+                        let mut p = projection.dot(v).canonical();
+                        p.set_z(v.z());
+                        p
+                    })
+                    .collect::<Vec<_>>();
                 for t in model.triangles.iter() {
-                    self.render_triangle(t, &vertices);
+                    self.render_triangle(t, &vertices, &model.vertices);
                 }
             }
         }

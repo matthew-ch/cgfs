@@ -279,7 +279,7 @@ fn rasterization() {
     });
 
     scene.set_camera(
-        (-2., 1., 4.).into(), 
+        (-3., 1., 2.).into(), 
         Matrix::rotation_y(30.),
         1.into(),
     );
