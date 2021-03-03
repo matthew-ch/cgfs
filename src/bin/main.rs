@@ -183,10 +183,10 @@ fn ray_tracing() {
 
     let polyhedron = PolyhedronObject {
         triangles: vec![
-            Triangle::new(vertices[0], vertices[1], vertices[2]),
-            Triangle::new(vertices[0], vertices[2], vertices[3]),
-            Triangle::new(vertices[0], vertices[3], vertices[1]),
-            Triangle::new(vertices[1], vertices[3], vertices[2]),
+            Triangle::new(vertices[0], vertices[2], vertices[1],),
+            Triangle::new(vertices[0], vertices[3], vertices[2],),
+            Triangle::new(vertices[0], vertices[1], vertices[3],),
+            Triangle::new(vertices[1], vertices[2], vertices[3],),
         ],
         material: Material {
             color: Color::black(),
@@ -234,9 +234,9 @@ fn rasterization() {
     let mut canvas = Canvas::new(600, 600, Color::white() * 0.9);
     let mut scene = Scene::new(1., 1., Color::black());
 
-    scene.add_model(SceneModel {
-        name: "cube".into(),
-        vertices: vec![
+    scene.add_model(SceneModel::new(
+        "cube".into(),
+        vec![
             [1., 1., 1.],
             [-1., 1., 1.],
             [-1., -1., 1.],
@@ -245,8 +245,8 @@ fn rasterization() {
             [-1., 1., -1.],
             [-1., -1., -1.],
             [1., -1., -1. ],
-        ],
-        triangles: vec![
+        ].into_iter().map(|v| v.into()).collect(),
+        vec![
             ([0, 1, 2], Color::red()),
             ([0, 2, 3], Color::red()),
             ([4, 0, 3], Color::green()),
@@ -260,7 +260,7 @@ fn rasterization() {
             ([2, 6, 7], Color::cyan()),
             ([2, 7, 3], Color::cyan()),
         ],
-    });
+    ));
 
     scene.add_instance(SceneModelInstance {
         model_name: "cube".into(),
@@ -279,7 +279,7 @@ fn rasterization() {
     });
 
     scene.set_camera(
-        (-3., 1., 2.).into(), 
+        (-2., 1., 4.).into(), 
         Matrix::rotation_y(30.),
         1.into(),
     );

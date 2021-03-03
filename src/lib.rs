@@ -218,20 +218,89 @@ impl Canvas {
     pub fn rasterize(&mut self, scene: &Scene) {
         let projection = scene.get_projection_matrix(self.width, self.height);
         let camera = scene.get_camera_matrix();
-        let m: Matrix = projection * camera;
+
+        let clipping_planes = scene.get_clipping_planes();
         for instance in scene.instances.iter() {
-            let model = scene.models.iter().find(|&model| model.name == instance.model_name);
-            if model.is_none() {
-                continue;
-            }
-            let model = model.unwrap();
-            let projected: Vec<Point> = model.vertices.iter()
-                .map(|&v| instance.transform.dot(&v.into()))
-                .map(|v| m.dot(&v).canonical())
+            let model = scene.models.iter().find(|&model| model.name == instance.model_name).expect("no model found for instance");
+            let transform: Matrix = camera * instance.transform;
+            let vertices: Vec<Point> = model.vertices.iter()
+                .map(|&v| transform.dot(&v.into()))
                 .collect();
-            for t in model.triangles.iter() {
-                self.render_triangle(t, &projected);
+            let model = SceneModel::new(model.name.clone(), vertices, model.triangles.clone());
+            if let Some(model) = Self::clip_model(&clipping_planes, model) {
+                let vertices = model.vertices.iter().map(|v| projection.dot(v).canonical()).collect::<Vec<_>>();
+                for t in model.triangles.iter() {
+                    self.render_triangle(t, &vertices);
+                }
             }
+        }
+    }
+
+    fn clip_model(clipping_planes: &Vec<Plane>, mut model: SceneModel) -> Option<SceneModel> {
+        let bounding_sphere = model.get_bounding_sphere();
+        let mut intersection_planes = Vec::new();
+        for plane in clipping_planes {
+            let d = plane.signed_distance(&bounding_sphere.center);
+            if d < -bounding_sphere.radius {
+                return None;
+            }
+            if d < bounding_sphere.radius {
+                intersection_planes.push(plane);
+            }
+        }
+        if intersection_planes.len() == 0 {
+            return Some(model);
+        }
+        let SceneModel { mut vertices, mut triangles, name, ..} = model;
+        for plane in intersection_planes {
+            let trs = triangles;
+            triangles = Vec::new();
+            for (vids, color) in trs {
+                let mut distance_id_pairs = vids.iter()
+                    .map(|&vid| (plane.signed_distance(&vertices[vid]), vid))
+                    .collect::<Vec<_>>();
+
+                loop {
+                    if distance_id_pairs[0].0 < distance_id_pairs[1].0 || distance_id_pairs[0].0 < distance_id_pairs[2].0 {
+                        distance_id_pairs.rotate_left(1);
+                    } else {
+                        break;
+                    }
+                }
+
+                if distance_id_pairs[0].0 <= 0. {
+                    continue
+                } else if distance_id_pairs[1].0 >= 0. && distance_id_pairs[2].0 >= 0. {
+                    triangles.push((vids, color));
+                } else if distance_id_pairs[1].0 <= 0. && distance_id_pairs[2].0 <= 0. {
+                    let (_tb, b) = plane.intersection(&vertices[distance_id_pairs[0].1], &vertices[distance_id_pairs[1].1]).unwrap();
+                    let (_tc, c) = plane.intersection(&vertices[distance_id_pairs[0].1], &vertices[distance_id_pairs[2].1]).unwrap();
+                    let l = vertices.len();
+                    vertices.push(b);
+                    vertices.push(c);
+                    triangles.push(([distance_id_pairs[0].1, l, l + 1], color));
+                } else {
+                    if distance_id_pairs[2].0 > 0. {
+                        distance_id_pairs.rotate_right(1);
+                    }
+                    let (_ta, a) = plane.intersection(&vertices[distance_id_pairs[0].1], &vertices[distance_id_pairs[2].1]).unwrap();
+                    let (_tb, b) = plane.intersection(&vertices[distance_id_pairs[1].1], &vertices[distance_id_pairs[2].1]).unwrap();
+                    let l = vertices.len();
+                    vertices.push(a);
+                    vertices.push(b);
+                    triangles.push(([distance_id_pairs[0].1, distance_id_pairs[1].1, l], color));
+                    triangles.push(([distance_id_pairs[1].1, l + 1, l], color));
+                }
+            }
+        }
+        if triangles.len() == 0 {
+            None
+        } else {
+            Some(SceneModel::new(
+                name,
+                vertices,
+                triangles,
+            ))
         }
     }
 }
@@ -331,6 +400,21 @@ impl Scene {
                 Matrix::new(mat)
             }
         ])
+    }
+
+    pub fn get_clipping_planes(&self) -> Vec<Plane> {
+        let camera_pos = Point::from((0., 0., 0.));
+        let top_left = Point::from((-self.viewport_width / 2., self.viewport_height / 2., self.camera_distance));
+        let top_right = Point::from((self.viewport_width / 2., self.viewport_height / 2., self.camera_distance));
+        let bottom_right = Point::from((self.viewport_width / 2., -self.viewport_height / 2., self.camera_distance));
+        let bottom_left = Point::from((-self.viewport_width / 2., -self.viewport_height / 2., self.camera_distance));
+        vec![
+            Plane { normal: (0., 0., 1., 0.).into(), d: -self.camera_distance },
+            Plane::from_points(camera_pos, top_left, bottom_left),
+            Plane::from_points(camera_pos, top_right, top_left),
+            Plane::from_points(camera_pos, bottom_right, top_right),
+            Plane::from_points(camera_pos, bottom_left, bottom_right),
+        ]
     }
 
     fn compute_lighting(&self, point: &Point, normal: &Vector, view: &Vector, specular: i32) -> f64 {

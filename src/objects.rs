@@ -233,8 +233,35 @@ impl LightObject for DirectionalLight {
 
 pub struct SceneModel {
     pub name: String,
-    pub vertices: Vec<[f64; 3]>,
+    pub vertices: Vec<Point>,
     pub triangles: Vec<([usize; 3], Color)>,
+    bounding_sphere: Option<Sphere>,
+}
+
+impl SceneModel {
+    pub fn new(name: String, vertices: Vec<Point>, triangles: Vec<([usize; 3], Color)>) -> Self {
+        Self {
+            name,
+            vertices,
+            triangles,
+            bounding_sphere: None,
+        }
+    }
+
+    pub fn get_bounding_sphere(&mut self) -> Sphere {
+        if let Some(sphere) = self.bounding_sphere {
+            sphere
+        } else {
+            let center: Point = self.vertices.iter().map(|&v| Point::from(v)).fold(Point::from((0., 0., 0., 0.)), |acc, v| acc + v) / self.vertices.len() as f64;
+            let radius = self.vertices.iter().map(|&v| (Point::from(v) - center).length()).max_by(|x, y| x.partial_cmp(y).unwrap()).unwrap_or(0.);
+            let sphere = Sphere {
+                center,
+                radius,
+            };
+            self.bounding_sphere = Some(sphere);
+            sphere
+        }
+    }
 }
 
 pub struct SceneModelInstance {

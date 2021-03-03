@@ -446,8 +446,8 @@ fn solve_equations(mut coefficients: [[f64; 3]; 3], mut rhs: [f64; 3]) -> Option
 
 impl Triangle {
     pub fn new(a: Point, b: Point, c: Point) -> Triangle {
-        let v: Vector = c - a;
-        let w: Vector = b - a;
+        let v: Vector = b - a;
+        let w: Vector = c - a;
         let cross = v.cross(&w);
         Triangle {
             a,
@@ -468,5 +468,39 @@ impl Triangle {
         ], [ao.x(), ao.y(), ao.z()])
         .map(|[r, s, t]| if r < 0. || s < 0. || r + s > 1. { None } else { Some(t) })
         .flatten()
+    }
+}
+
+pub struct Plane {
+    pub normal: Vector,
+    pub d: f64,
+}
+
+impl Plane {
+    pub fn from_points(a: Point, b: Point, c: Point) -> Self {
+        let v: Vector = b - a;
+        let w: Vector = c - a;
+        let cross = v.cross(&w);
+        let normal: Vector = cross / cross.length();
+        let d = -normal.dot(&a);
+        Self {
+            normal,
+            d,
+        }
+    }
+
+    pub fn signed_distance(&self, p: &Point) -> f64 {
+        self.normal.dot(p) + self.d
+    }
+
+    pub fn intersection(&self, a: &Point, b: &Point) -> Option<(f64, Point)> {
+        let ab = *b - *a;
+        let denom = self.normal.dot(&ab);
+        if denom == 0. {
+            None
+        } else {
+            let t = (-self.d - self.normal.dot(a)) / denom;
+            Some((t, *a + ab * t))
+        }
     }
 }
