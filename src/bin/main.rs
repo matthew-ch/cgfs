@@ -278,6 +278,16 @@ fn rasterization() {
         ]),
     });
 
+    scene.add_model(SceneModel::create_sphere_model("sphere".into(), 12, Color::green()));
+
+    scene.add_instance(SceneModelInstance {
+        model_name: "sphere".into(),
+        transform: Matrix::compose(vec![
+            Matrix::translation(1.75, -0.5, 7.),
+            Matrix::scale(1.5),
+        ]),
+    });
+
     scene.set_camera(
         (-3., 1., 2.).into(), 
         Matrix::rotation_y(30.),

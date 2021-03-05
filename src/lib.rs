@@ -4,17 +4,17 @@ pub use components::*;
 pub use objects::*;
 use std::thread;
 use std::mem;
-use std::ops::RangeInclusive;
+use std::ops::{RangeInclusive, Sub, Add, Div, Mul};
 
 pub(crate) const EPS: f64 = 0.001;
 pub(crate) const AIR_REFRACTION_INDEX: f64 = 1.0;
 
-fn interpolate(i0: i32, d0: f64, i1: i32, d1: f64) -> Vec<f64> {
+fn interpolate<T>(i0: i32, d0: T, i1: i32, d1: T) -> Vec<T> where T: Sub<T, Output=T> + Add<T, Output=T> + Div<f64, Output=T> + Mul<f64, Output=T> + Clone + Copy {
     if i0 == i1 {
         vec![d0]
     } else {
         let a = (d1 - d0) / (i1 - i0) as f64;
-        (i0..=i1).into_iter().map(|i| (i - i0) as f64 * a + d0).collect()
+        (i0..=i1).into_iter().map(|i| a * (i - i0) as f64 + d0).collect()
     }
 }
 
@@ -254,7 +254,7 @@ impl Canvas {
                 .collect();
             let model = SceneModel::new(model.name.clone(), vertices, model.triangles.clone());
             if let Some(model) = Self::clip_model(&clipping_planes, model) {
-                let vertices = model.vertices.iter()
+                let projected = model.vertices.iter()
                     .map(|v| {
                         let mut p = projection.dot(v).canonical();
                         p.set_z(v.z());
@@ -262,7 +262,7 @@ impl Canvas {
                     })
                     .collect::<Vec<_>>();
                 for t in model.triangles.iter() {
-                    self.render_triangle(t, &vertices, &model.vertices);
+                    self.render_triangle(t, &projected, &model.vertices);
                 }
             }
         }

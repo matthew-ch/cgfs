@@ -248,6 +248,47 @@ impl SceneModel {
         }
     }
 
+    pub fn create_sphere_model(name: String, divides: usize, color: Color) -> Self {
+        let mut vertices = vec![
+            Point::from((0., 1., 0.)),
+            Point::from((0., -1., 0.)),
+        ];
+        let mut triangles = Vec::new();
+        let s = 2 * divides + 2;
+        let step_h = (360. / s as f64).to_radians();
+        let rxz_y_lookup = {
+            let step_v = (180. / (divides + 1) as f64).to_radians();
+            (1..=divides).into_iter().map(|d| (d as f64 * step_v).sin_cos()).collect::<Vec<_>>()
+        };
+        let mut lngs = Vec::new();
+        for k in 0..s {
+            let mut lng = Vec::new();
+            let (sin, cos) = (step_h * k as f64).sin_cos();
+            lng.push(0);
+            for i in 0..divides {
+                lng.push(vertices.len());
+                vertices.push(Point::from((rxz_y_lookup[i].0 * cos, rxz_y_lookup[i].1, rxz_y_lookup[i].0 * sin)));
+            }
+            lng.push(1);
+            lngs.push(lng);
+        }
+        for k in 0..s {
+            let lng1 = &lngs[k];
+            let lng2 = &lngs[(k + 1) % s];
+            for i in 0..divides {
+                triangles.push(([lng1[i], lng2[i+1], lng1[i+1]], color));
+                triangles.push(([lng1[i+1], lng2[i+1], lng2[i+2]], color));
+            }
+        }
+
+        SceneModel {
+            name,
+            triangles,
+            vertices,
+            bounding_sphere: Some(Sphere{ center: (0., 0., 0.).into(), radius: 1. }),
+        }
+    }
+
     pub fn get_bounding_sphere(&mut self) -> Sphere {
         if let Some(sphere) = self.bounding_sphere {
             sphere
