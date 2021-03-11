@@ -179,6 +179,7 @@ impl SceneObject for PolyhedronObject {
 
 pub trait LightObject {
     fn intensity_from(&self, scene: &Scene, point: &Point, normal: &Vector, view: &Vector, specular: i32) -> f64;
+    fn intensity_after(&self, transform: &Matrix, point: &Point, normal: &Vector, view: &Vector, specular: i32) -> f64;
 }
 
 fn compute_light_factor(normal: &Vector, light: &Vector, view: &Vector, specular: i32) -> f64 {
@@ -197,6 +198,10 @@ impl LightObject for AmbientLight {
     fn intensity_from(&self, _scene: &Scene, _point: &Point, _normal: &Vector, _view: &Vector, _specular: i32) -> f64 {
         self.intensity
     }
+
+    fn intensity_after(&self, _transform: &Matrix, _point: &Point, _normal: &Vector, _view: &Vector, _specular: i32) -> f64 {
+        self.intensity
+    }
 }
 
 pub struct PointLight {
@@ -213,6 +218,11 @@ impl LightObject for PointLight {
             self.intensity * compute_light_factor(normal, &light, view, specular)
         }
     }
+
+    fn intensity_after(&self, transform: &Matrix, point: &Point, normal: &Vector, view: &Vector, specular: i32) -> f64 {
+        let light: Vector = transform.dot(&self.position) - *point;
+        self.intensity * compute_light_factor(normal, &light, view, specular)
+    }
 }
 
 pub struct DirectionalLight {
@@ -228,18 +238,41 @@ impl LightObject for DirectionalLight {
             self.intensity * compute_light_factor(normal, &self.direction, view, specular)
         }
     }
+
+    fn intensity_after(&self, transform: &Matrix, _point: &Point, normal: &Vector, view: &Vector, specular: i32) -> f64 {
+        let light = transform.dot(&self.direction);
+        self.intensity * compute_light_factor(normal, &light, view, specular)
+    }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct SceneModelTriangle {
+    pub indices: [usize; 3],
+    pub normals: Option<[Vector; 3]>,
+    pub color: Color,
+    pub specular: i32,
+}
+
+impl From<([usize; 3], Color, i32)> for SceneModelTriangle {
+    fn from(value: ([usize; 3], Color, i32)) -> Self {
+        Self {
+            indices: value.0,
+            normals: None,
+            color: value.1,
+            specular: value.2,
+        }
+    }
+}
 
 pub struct SceneModel {
     pub name: String,
     pub vertices: Vec<Point>,
-    pub triangles: Vec<([usize; 3], Color)>,
+    pub triangles: Vec<SceneModelTriangle>,
     bounding_sphere: Option<Sphere>,
 }
 
 impl SceneModel {
-    pub fn new(name: String, vertices: Vec<Point>, triangles: Vec<([usize; 3], Color)>) -> Self {
+    pub fn new(name: String, vertices: Vec<Point>, triangles: Vec<SceneModelTriangle>) -> Self {
         Self {
             name,
             vertices,
@@ -248,7 +281,7 @@ impl SceneModel {
         }
     }
 
-    pub fn create_sphere_model(name: String, divides: usize, color: Color) -> Self {
+    pub fn create_sphere_model(name: String, divides: usize, color: Color, specular: i32) -> Self {
         let mut vertices = vec![
             Point::from((0., 1., 0.)),
             Point::from((0., -1., 0.)),
@@ -276,8 +309,18 @@ impl SceneModel {
             let lng1 = &lngs[k];
             let lng2 = &lngs[(k + 1) % s];
             for i in 0..divides {
-                triangles.push(([lng1[i], lng2[i+1], lng1[i+1]], color));
-                triangles.push(([lng1[i+1], lng2[i+1], lng2[i+2]], color));
+                triangles.push(SceneModelTriangle {
+                    indices: [lng1[i], lng2[i+1], lng1[i+1]],
+                    normals: Some([vertices[lng1[i]].vector(), vertices[lng2[i+1]].vector(), vertices[lng1[i+1]].vector()]),
+                    color,
+                    specular,
+                });
+                triangles.push(SceneModelTriangle {
+                    indices: [lng1[i+1], lng2[i+1], lng2[i+2]],
+                    normals: Some([vertices[lng1[i+1]].vector(), vertices[lng2[i+1]].vector(), vertices[lng2[i+2]].vector()]),
+                    color,
+                    specular,
+                });
             }
         }
 

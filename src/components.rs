@@ -147,6 +147,10 @@ impl HomogeneousCoordinate {
         self.3 = w;
     }
 
+    pub fn vector(&self) -> Self {
+        Self(self.0, self.1, self.2, 0.)
+    }
+
     pub fn dot(&self, rhs: &Self) -> f64 {
         self.0 * rhs.0 + self.1 * rhs.1 + self.2 * rhs.2 + self.3 * rhs.3
     }

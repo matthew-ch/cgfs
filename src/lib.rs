@@ -18,6 +18,13 @@ fn interpolate<T>(i0: i32, d0: T, i1: i32, d1: T) -> Vec<T> where T: Sub<T, Outp
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum Shading {
+    FLAT,
+    GOURAUD,
+    PHONG,
+}
+
 pub struct Canvas {
     width: u32,
     height: u32,
@@ -37,6 +44,10 @@ impl Canvas {
             image_data,
             depth_buffer: vec![0.; (width * height) as usize],
         }
+    }
+
+    pub fn clear(&mut self, background: Color) {
+        self.image_data.fill(background.clamp());
     }
 
     pub fn get_width(&self) -> u32 {
@@ -174,21 +185,28 @@ impl Canvas {
         self.draw_line(p2, p0, color);
     }
 
-    pub fn draw_shaded_triangle(&mut self, mut p0: Point, mut p1: Point, mut p2: Point, color: Color) {
+    pub fn draw_shaded_triangle(&mut self, mut p0: Point, mut p1: Point, mut p2: Point, compute_color: &dyn Fn(Point, [f64; 3]) -> Color) {
+        let mut v0 = Point::from((1., 0., 0.));
+        let mut v1 = Point::from((0., 1., 0.));
+        let mut v2 = Point::from((0., 0., 1.));
         if p1.y() < p0.y() {
             mem::swap(&mut p1, &mut p0);
+            mem::swap(&mut v1, &mut v0);
         }
         if p2.y() < p0.y() {
             mem::swap(&mut p2, &mut p0);
+            mem::swap(&mut v2, &mut v0);
         }
         if p2.y() < p1.y() {
             mem::swap(&mut p2, &mut p1);
+            mem::swap(&mut v2, &mut v1);
         }
         let y0 = p0.y().round() as i32;
         let y1 = p1.y().round() as i32;
         let y2 = p2.y().round() as i32;
         let x02 = interpolate(y0, p0.x(), y2, p2.x());
         let iz02 = interpolate(y0, 1. / p0.z(), y2, 1. / p2.z());
+        let v02 = interpolate(y0, v0, y2, v2);
         let x012 = {
             let mut x01 = interpolate(y0, p0.x(), y1, p1.x());
             let mut x12 = interpolate(y1, p1.x(), y2, p2.x());
@@ -203,13 +221,20 @@ impl Canvas {
             iz01.append(&mut iz12);
             iz01
         };
+        let v012 = {
+            let mut v01 = interpolate(y0, v0, y1, v1);
+            let mut v12 = interpolate(y1, v1, y2, v2);
+            v01.pop();
+            v01.append(&mut v12);
+            v01
+        };
         assert!(x02.len() == x012.len());
-        let (x_left, x_right, iz_left, iz_right) = {
+        let (x_left, x_right, iz_left, iz_right, v_left, v_right) = {
             let m = x02.len() / 2;
             if x02[m] < x012[m] {
-                (&x02, &x012, &iz02, &iz012)
+                (&x02, &x012, &iz02, &iz012, &v02, &v012)
             } else {
-                (&x012, &x02, &iz012, &iz02)
+                (&x012, &x02, &iz012, &iz02, &v012, &v02)
             }
         };
         for y in y0..=y2 {
@@ -217,31 +242,78 @@ impl Canvas {
             let l = x_left[i].round() as i32;
             let r = x_right[i].round() as i32;
             let izs = interpolate(l, iz_left[i], r, iz_right[i]);
+            let vs = interpolate(l, v_left[i], r, v_right[i]);
             for x in l..=r {
                 let iz = izs[(x - l) as usize];
+                let v = vs[(x - l) as usize];
                 if self.update_depth_buffer(x, y, iz) {
-                    self.put_pixel(x, y, color);
+                    self.put_pixel(x, y, compute_color((x as f64, y as f64, iz).into(), [v.x(), v.y(), v.z()]));
                 }
             }
         }
     }
 
-    fn render_triangle(&mut self, triangle: &([usize; 3], Color), projected: &Vec<Point>, model_vertices: &Vec<Point>) {
-        let [i, j, k] = triangle.0;
+    fn render_triangle(
+        &mut self,
+        triangle: &SceneModelTriangle, projected: &Vec<Point>, model_vertices: &Vec<Point>,
+        camera_transform: &Matrix, scene: &Scene,
+        shading: Shading,
+        wireframe: bool,
+    ) {
+        let [i, j, k] = triangle.indices;
         let normal = Triangle::new(model_vertices[i], model_vertices[j], model_vertices[k]).normal;
         let center = (model_vertices[i] + model_vertices[j] + model_vertices[k]) / 3.;
+        let specular = 50;
         if normal.dot(&center) < 0. {
+            let normals = triangle.normals.unwrap_or([normal; 3]);
+
+            let color_fn: Box<dyn Fn(Point, [f64; 3]) -> Color>  = match shading {
+                Shading::FLAT => {
+                    let intensity = scene.lights.iter().map(|light|
+                        light.intensity_after(camera_transform, &center, &normal, &-center, specular)).sum();
+                    let color = triangle.color * intensity;
+                    Box::new(move |_point: Point, _mix: [f64; 3]| color)
+                },
+                Shading::GOURAUD => {
+                    let ia: f64 = scene.lights.iter().map(|light|
+                        light.intensity_after(camera_transform, &model_vertices[i], &normals[0], &-model_vertices[i], specular)).sum();
+                    let ib: f64 = scene.lights.iter().map(|light|
+                        light.intensity_after(camera_transform, &model_vertices[j], &normals[1], &-model_vertices[j], specular)).sum();
+                    let ic: f64 = scene.lights.iter().map(|light|
+                        light.intensity_after(camera_transform, &model_vertices[k], &normals[2], &-model_vertices[k], specular)).sum();
+                    Box::new(move |_point: Point, mix: [f64; 3]| triangle.color * (ia * mix[0] + ib * mix[1] + ic * mix[2]))
+                },
+                Shading::PHONG => {
+                    let canvas_width = self.width as f64;
+                    let canvas_height = self.height as f64;
+                    Box::new(
+                        move |point: Point, mix: [f64; 3]| {
+                            let z = 1. / point.z();
+                            let x = point.x() * scene.viewport_width / canvas_width / scene.camera_distance * z;
+                            let y = point.y() * scene.viewport_height / canvas_height / scene.camera_distance * z;
+                            let point = (x, y, z).into();
+                            let normal = normals[0] * mix[0] + normals[1] * mix[1] + normals[2] * mix[2];
+                            let intensity = scene.lights.iter().map(|light|
+                                light.intensity_after(camera_transform, &point, &normal, &-point.vector(), specular)).sum();
+                            triangle.color * intensity
+                        }
+                    )
+                }
+            };
+
             self.draw_shaded_triangle(
                 projected[i], 
                 projected[j], 
                 projected[k],
-                triangle.1,
+                &color_fn,
             );
-            // self.draw_wireframe_triangle(projected[i], projected[j], projected[k], triangle.1 * 0.7);
+            if wireframe {
+                self.draw_wireframe_triangle(projected[i], projected[j], projected[k], triangle.color * 0.7);
+            }
         }
     }
 
-    pub fn rasterize(&mut self, scene: &Scene) {
+    pub fn rasterize(&mut self, scene: &Scene, shading: Shading, wireframe: bool) {
         let projection = scene.get_projection_matrix(self.width, self.height);
         let camera = scene.get_camera_matrix();
 
@@ -252,23 +324,33 @@ impl Canvas {
             let vertices: Vec<Point> = model.vertices.iter()
                 .map(|&v| transform.dot(&v.into()))
                 .collect();
-            let model = SceneModel::new(model.name.clone(), vertices, model.triangles.clone());
-            if let Some(model) = Self::clip_model(&clipping_planes, model) {
-                let projected = model.vertices.iter()
+            let mut triangles = model.triangles.clone();
+            for tr in triangles.iter_mut() {
+                tr.normals = tr.normals.map(|ns| {
+                    [
+                        transform.dot(&ns[0]),
+                        transform.dot(&ns[1]),
+                        transform.dot(&ns[2]),
+                    ]
+                });
+            }
+            let model = SceneModel::new(model.name.clone(), vertices, triangles);
+            if let Some((vertices, triangles)) = Self::clip_model(&clipping_planes, model) {
+                let projected = vertices.iter()
                     .map(|v| {
                         let mut p = projection.dot(v).canonical();
                         p.set_z(v.z());
                         p
                     })
                     .collect::<Vec<_>>();
-                for t in model.triangles.iter() {
-                    self.render_triangle(t, &projected, &model.vertices);
+                for t in triangles.iter() {
+                    self.render_triangle(t, &projected, &vertices, &camera, scene, shading, wireframe);
                 }
             }
         }
     }
 
-    fn clip_model(clipping_planes: &Vec<Plane>, mut model: SceneModel) -> Option<SceneModel> {
+    fn clip_model(clipping_planes: &Vec<Plane>, mut model: SceneModel) -> Option<(Vec<Point>, Vec<SceneModelTriangle>)> {
         let bounding_sphere = model.get_bounding_sphere();
         let mut intersection_planes = Vec::new();
         for plane in clipping_planes {
@@ -280,21 +362,22 @@ impl Canvas {
                 intersection_planes.push(plane);
             }
         }
+        let SceneModel { mut vertices, mut triangles, ..} = model;
         if intersection_planes.len() == 0 {
-            return Some(model);
+            return Some((vertices, triangles));
         }
-        let SceneModel { mut vertices, mut triangles, name, ..} = model;
         for plane in intersection_planes {
             let trs = triangles;
             triangles = Vec::new();
-            for (vids, color) in trs {
-                let mut distance_id_pairs = vids.iter()
+            for SceneModelTriangle { indices, mut normals, color, specular } in trs {
+                let mut distance_id_pairs = indices.iter()
                     .map(|&vid| (plane.signed_distance(&vertices[vid]), vid))
                     .collect::<Vec<_>>();
 
                 loop {
                     if distance_id_pairs[0].0 < distance_id_pairs[1].0 || distance_id_pairs[0].0 < distance_id_pairs[2].0 {
                         distance_id_pairs.rotate_left(1);
+                        normals = normals.map(|ns| [ns[1], ns[2], ns[0]]);
                     } else {
                         break;
                     }
@@ -303,36 +386,71 @@ impl Canvas {
                 if distance_id_pairs[0].0 <= 0. {
                     continue
                 } else if distance_id_pairs[1].0 >= 0. && distance_id_pairs[2].0 >= 0. {
-                    triangles.push((vids, color));
+                    triangles.push(SceneModelTriangle {
+                        indices: [distance_id_pairs[0].1, distance_id_pairs[1].1, distance_id_pairs[2].1],
+                        normals,
+                        color,
+                        specular
+                    });
                 } else if distance_id_pairs[1].0 <= 0. && distance_id_pairs[2].0 <= 0. {
-                    let (_tb, b) = plane.intersection(&vertices[distance_id_pairs[0].1], &vertices[distance_id_pairs[1].1]).unwrap();
-                    let (_tc, c) = plane.intersection(&vertices[distance_id_pairs[0].1], &vertices[distance_id_pairs[2].1]).unwrap();
+                    let (tb, b) = plane.intersection(&vertices[distance_id_pairs[0].1], &vertices[distance_id_pairs[1].1]).unwrap();
+                    let (tc, c) = plane.intersection(&vertices[distance_id_pairs[0].1], &vertices[distance_id_pairs[2].1]).unwrap();
                     let l = vertices.len();
                     vertices.push(b);
                     vertices.push(c);
-                    triangles.push(([distance_id_pairs[0].1, l, l + 1], color));
+                    triangles.push(SceneModelTriangle {
+                        indices: [distance_id_pairs[0].1, l, l + 1],
+                        normals: normals.map(|ns|
+                            [
+                                ns[0],
+                                ns[0] + (ns[1] - ns[0]) * tb,
+                                ns[0] + (ns[2] - ns[0]) * tc,
+                            ]
+                        ),
+                        color,
+                        specular,
+                    });
                 } else {
                     if distance_id_pairs[2].0 > 0. {
                         distance_id_pairs.rotate_right(1);
+                        normals = normals.map(|ns| [ns[2], ns[0], ns[1]]);
                     }
-                    let (_ta, a) = plane.intersection(&vertices[distance_id_pairs[0].1], &vertices[distance_id_pairs[2].1]).unwrap();
-                    let (_tb, b) = plane.intersection(&vertices[distance_id_pairs[1].1], &vertices[distance_id_pairs[2].1]).unwrap();
+                    let (ta, a) = plane.intersection(&vertices[distance_id_pairs[0].1], &vertices[distance_id_pairs[2].1]).unwrap();
+                    let (tb, b) = plane.intersection(&vertices[distance_id_pairs[1].1], &vertices[distance_id_pairs[2].1]).unwrap();
                     let l = vertices.len();
                     vertices.push(a);
                     vertices.push(b);
-                    triangles.push(([distance_id_pairs[0].1, distance_id_pairs[1].1, l], color));
-                    triangles.push(([distance_id_pairs[1].1, l + 1, l], color));
+                    triangles.push(SceneModelTriangle {
+                        indices: [distance_id_pairs[0].1, distance_id_pairs[1].1, l],
+                        normals: normals.map(|ns|
+                            [
+                                ns[0],
+                                ns[1],
+                                ns[0] + (ns[2] - ns[0]) * ta,
+                            ]
+                        ),
+                        color,
+                        specular,
+                    });
+                    triangles.push(SceneModelTriangle {
+                        indices: [distance_id_pairs[1].1, l + 1, l],
+                        normals: normals.map(|ns|
+                            [
+                                ns[1],
+                                ns[1] + (ns[2] - ns[1]) * tb,
+                                ns[0] + (ns[2] - ns[0]) * ta,
+                            ]
+                        ),
+                        color,
+                        specular,
+                    });
                 }
             }
         }
         if triangles.len() == 0 {
             None
         } else {
-            Some(SceneModel::new(
-                name,
-                vertices,
-                triangles,
-            ))
+            Some((vertices, triangles))
         }
     }
 }

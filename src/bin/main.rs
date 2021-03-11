@@ -66,11 +66,7 @@ fn ray_tracing() {
             radius: 5000.,
         },
         material: Material {
-            color: Color {
-                r: 255.,
-                g: 255.,
-                b: 0.,
-            },
+            color: Color::yellow(),
             specular: 1000,
             reflective: 0.2,
             transparency: None,
@@ -247,18 +243,18 @@ fn rasterization() {
             [1., -1., -1. ],
         ].into_iter().map(|v| v.into()).collect(),
         vec![
-            ([0, 1, 2], Color::red()),
-            ([0, 2, 3], Color::red()),
-            ([4, 0, 3], Color::green()),
-            ([4, 3, 7], Color::green()),
-            ([5, 4, 7], Color::blue()),
-            ([5, 7, 6], Color::blue()),
-            ([1, 5, 6], Color::yellow()),
-            ([1, 6, 2], Color::yellow()),
-            ([4, 5, 1], Color::purple()),
-            ([4, 1, 0], Color::purple()),
-            ([2, 6, 7], Color::cyan()),
-            ([2, 7, 3], Color::cyan()),
+            ([0, 1, 2], Color::red(), 50).into(),
+            ([0, 2, 3], Color::red(), 50).into(),
+            ([4, 0, 3], Color::green(), 50).into(),
+            ([4, 3, 7], Color::green(), 50).into(),
+            ([5, 4, 7], Color::blue(), 50).into(),
+            ([5, 7, 6], Color::blue(), 50).into(),
+            ([1, 5, 6], Color::yellow(), 50).into(),
+            ([1, 6, 2], Color::yellow(), 50).into(),
+            ([4, 5, 1], Color::purple(), 50).into(),
+            ([4, 1, 0], Color::purple(), 50).into(),
+            ([2, 6, 7], Color::cyan(), 50).into(),
+            ([2, 7, 3], Color::cyan(), 50).into(),
         ],
     ));
 
@@ -278,7 +274,7 @@ fn rasterization() {
         ]),
     });
 
-    scene.add_model(SceneModel::create_sphere_model("sphere".into(), 12, Color::green()));
+    scene.add_model(SceneModel::create_sphere_model("sphere".into(), 12, Color::green(), 50));
 
     scene.add_instance(SceneModelInstance {
         model_name: "sphere".into(),
@@ -288,26 +284,153 @@ fn rasterization() {
         ]),
     });
 
+    scene.add_light(Box::new(AmbientLight {
+        intensity: 0.2,
+    }));
+    scene.add_light(Box::new(DirectionalLight {
+        intensity: 0.2,
+        direction: (-1., 0., 1., 0.).into(),
+    }));
+    scene.add_light(Box::new(PointLight {
+        intensity: 0.6,
+        position: (-3., 2., -10.).into(),
+    }));
+
     scene.set_camera(
         (-3., 1., 2.).into(), 
         Matrix::rotation_y(30.),
-        1.into(),
+        1.5,
     );
 
     let t1 = std::time::SystemTime::now();
-
-    canvas.rasterize(&scene);
-
+    canvas.rasterize(&scene, Shading::PHONG, false);
     let t2 = std::time::SystemTime::now();
     println!("single thread render time: {:?}", t2.duration_since(t1));
     save_canvas_to(&canvas, r"./output.png");
 }
 
+fn compare() {
+    let mut canvas = Canvas::new(600, 600, Color::white());
+    let mut scene = Scene::new(1., 1., Color::white());
+    
+    let red_sphere = SphereObject {
+        sphere: Sphere {
+            center: (0., -1., 3.).into(),
+            radius: 1.,
+        },
+        material: Material{
+            color: Color::red(),
+            specular: 50,
+            reflective: 0.,
+            transparency: None,
+        },
+    };
+
+    let blue_sphere = SphereObject {
+        sphere: Sphere {
+            center: (2., 0., 4.).into(),
+            radius: 1.,
+        },
+        material: Material {
+            color: Color::blue(),
+            specular: 50,
+            reflective: 0.,
+            transparency: None,
+        },
+    };
+
+    let green_sphere = SphereObject {
+        sphere: Sphere {
+            center: (-2., 0., 4.).into(),
+            radius: 1.,
+        },
+        material: Material {
+            color: Color::green(),
+            specular: 50,
+            reflective: 0.,
+            transparency: None,
+        },
+    };
+
+    let yellow_sphere = SphereObject {
+        sphere: Sphere {
+            center: (0., -5001., 0.).into(),
+            radius: 5000.,
+        },
+        material: Material {
+            color: Color::yellow(),
+            specular: 50,
+            reflective: 0.,
+            transparency: None,
+        },
+    };
+
+    scene.add_object(Box::new(red_sphere));
+    scene.add_object(Box::new(blue_sphere));
+    scene.add_object(Box::new(green_sphere));
+    scene.add_object(Box::new(yellow_sphere));
+
+    scene.add_model(SceneModel::create_sphere_model("red_sphere".into(), 16, Color::red(), 50));
+    scene.add_model(SceneModel::create_sphere_model("green_sphere".into(), 16, Color::green(), 50));
+    scene.add_model(SceneModel::create_sphere_model("blue_sphere".into(), 16, Color::blue(), 50));
+    scene.add_model(SceneModel::create_sphere_model("yellow_sphere".into(), 128, Color::yellow(), 50));
+    scene.add_instance(SceneModelInstance {
+        model_name: "red_sphere".into(),
+        transform: Matrix::translation(0., -1., 3.),
+    });
+    scene.add_instance(SceneModelInstance {
+        model_name: "green_sphere".into(),
+        transform: Matrix::translation(-2., 0., 4.),
+    });
+    scene.add_instance(SceneModelInstance {
+        model_name: "blue_sphere".into(),
+        transform: Matrix::translation(2., 0., 4.),
+    });
+    scene.add_instance(SceneModelInstance {
+        model_name: "yellow_sphere".into(),
+        transform: Matrix::compose(vec![
+            Matrix::translation(0., -5001., 0.),
+            Matrix::scale(5000.),
+        ]),
+    });
+
+    scene.add_light(Box::new(AmbientLight { intensity: 0.2 }));
+    scene.add_light(Box::new(PointLight {
+        intensity: 0.6,
+        position: (2., 1., 0.).into(),
+    }));
+    scene.add_light(Box::new(DirectionalLight {
+        intensity: 0.2,
+        direction: (1., 4., 4., 0.).into(),
+    }));
+
+    scene.set_camera(
+        (-1.5, 0.5, -0.5).into(),
+        Matrix::rotation_y(10.),
+        1.2
+    );
+
+    let t1 = std::time::SystemTime::now();
+    canvas.render(&scene, 0, 1);
+    let t2 = std::time::SystemTime::now();
+    println!("single thread render time: {:?}", t2.duration_since(t1));
+    save_canvas_to(&canvas, r"./comp-ray.png");
+
+    canvas.clear(Color::white());
+
+    let t1 = std::time::SystemTime::now();
+    canvas.rasterize(&scene, Shading::PHONG, false);
+    let t2 = std::time::SystemTime::now();
+    println!("single thread render time: {:?}", t2.duration_since(t1));
+    save_canvas_to(&canvas, r"./comp-ras.png");
+}
+
 fn main() {
-    let mode = 2;
-    if mode == 1 {
-        ray_tracing();
-    } else {
-        rasterization();
-    }
+    let mode = 3;
+    match mode {
+        1 => ray_tracing(),
+        2 => rasterization(),
+        3 => compare(),
+        _ => (),
+    };
 }
